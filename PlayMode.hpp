@@ -1,5 +1,7 @@
 #include "Mode.hpp"
 
+#include "Scene.hpp"
+
 #include "Connection.hpp"
 #include "Game.hpp"
 
@@ -30,5 +32,21 @@ struct PlayMode : Mode {
 
 	//connection to server:
 	Client &client;
+
+	//visuals
+	// TODO: Use load?
+	// Scene::Drawable leftHands; 
+	// Scene::Drawable rightHands;
+	float handOffset = 0.5f;
+	// Scene::Drawable rope;
+	// Scene::Drawable plDiamond;
+	// Scene::Drawable prSpade;
+
+	// //anything that's not shown is pushed off screen
+	// Scene::Drawable emptyBox;
+	// Scene::Drawable triggerBox; // default
+	// Scene::Drawable pullBoxL; // left player
+	// Scene::Drawable pullBoxR; // right player
+	// Scene::Drawable counterBox; // default
 
 };

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
+#include <cstdlib>
 
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/norm.hpp>
@@ -76,6 +77,17 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 //-----------------------------------------
 
 Game::Game() : mt(0x15466666) {
+	srand((unsigned int)time(0));
+}
+
+bool Game::make_player_active(Player *player) {
+	if (Player::activePlayerCount >= 2) return false;
+
+	player->activePlayer = true;
+	if (Player::activePlayerCount == 0) player->advantageDirection = -1;
+	else player->advantageDirection = 1;
+	Player::activePlayerCount++;
+	return true;
 }
 
 Player *Game::spawn_player() {
@@ -93,7 +105,23 @@ Player *Game::spawn_player() {
 	} while (player.color == glm::vec3(0.0f));
 	player.color = glm::normalize(player.color);
 
-	player.name = "Player " + std::to_string(next_player_number++);
+	player.name = "Player " + std::to_string(next_player_number);
+	player.playerNumber = next_player_number++;
+
+	// Limit to two players (beyond that are spectators)
+	if (Player::activePlayerCount < 2) {
+		make_player_active(&player);
+
+		std::cout << "Spawned Player " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
+	}
+	else {
+		player.position.x = ArenaMin.x - ((ArenaMax.x - ArenaMin.x) / 2);
+		player.position.y = ArenaMin.y - ((ArenaMax.y - ArenaMin.y) / 2);
+		player.activePlayer = false;
+		std::cout << "Spawned Spectator " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
+	}
+
+	gameState = Player::activePlayerCount >= 2 ? GameState::NEUTRAL : GameState::NEUTRAL;
 
 	return &player;
 }
@@ -102,6 +130,20 @@ void Game::remove_player(Player *player) {
 	bool found = false;
 	for (auto pi = players.begin(); pi != players.end(); ++pi) {
 		if (&*pi == player) {
+			if (player->activePlayer) {
+				Player::activePlayerCount--;
+
+				auto nextPlayer = pi;
+				nextPlayer++;
+				if (nextPlayer != players.end() && !(nextPlayer->activePlayer)) {
+					make_player_active(&*player);
+					nextPlayer->position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+					nextPlayer->position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+					std::cout << "Player " << nextPlayer->playerNumber << " jumped in!" << std::endl;
+				}
+				std::cout << "Removed Player " << pi->playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
+
+			}
 			players.erase(pi);
 			found = true;
 			break;
@@ -110,82 +152,149 @@ void Game::remove_player(Player *player) {
 	assert(found);
 }
 
+/**********************************************
+ * HEY! This is where the game logic happens!!
+ **********************************************/
 void Game::update(float elapsed) {
-	//position/velocity update:
+	// We need to do two passes on the game state
+
+	// input -> game state
+	// process all input effects on game state and the player (first pass for game state):
+	int correctHits = 0;
+	GameState nextState = gameState;
+
 	for (auto &p : players) {
-		glm::vec2 dir = glm::vec2(0.0f, 0.0f);
-		if (p.controls.left.pressed) dir.x -= 1.0f;
-		if (p.controls.right.pressed) dir.x += 1.0f;
-		if (p.controls.down.pressed) dir.y -= 1.0f;
-		if (p.controls.up.pressed) dir.y += 1.0f;
+		if (p.activePlayer) {
+			p.inputs.clear();
+			if (p.controls.left.pressed) p.inputs.emplace_back(&(p.controls.left));
+			if (p.controls.right.pressed) p.inputs.emplace_back(&(p.controls.right));
+			if (p.controls.down.pressed) p.inputs.emplace_back(&(p.controls.down));
+			if (p.controls.up.pressed) p.inputs.emplace_back(&(p.controls.up));
 
-		if (dir == glm::vec2(0.0f)) {
-			//no inputs: just drift to a stop
-			float amt = 1.0f - std::pow(0.5f, elapsed / (PlayerAccelHalflife * 2.0f));
-			p.velocity = glm::mix(p.velocity, glm::vec2(0.0f,0.0f), amt);
-		} else {
-			//inputs: tween velocity to target direction
-			dir = glm::normalize(dir);
-
-			float amt = 1.0f - std::pow(0.5f, elapsed / PlayerAccelHalflife);
-
-			//accelerate along velocity (if not fast enough):
-			float along = glm::dot(p.velocity, dir);
-			if (along < PlayerSpeed) {
-				along = glm::mix(along, PlayerSpeed, amt);
+			switch (gameState) {
+				case GameState::NEUTRAL:
+					// TODO: any inputs should trigger a false start
+					break;
+				case GameState::TRIGGER:
+					// TODO: if the player is pressing the correct button and has no penalty, increment correctHits and set advantage
+					// 		 otherwise, any incorrect inputs should trigger a false start 
+					break;
+				case GameState::ADVANTAGE:
+					if (nextState != GameState::NEUTRAL) { // if next state is neutral, the advantaged player ended their tug
+						// TODO:
+						// if I have advantage:
+						// 	if pressing the same button, set nextState to NEUTRAL
+						// 	otherwise, stay in advantage
+						// otherwise:
+						//	if pressing the counter button, set nextState to COUNTER
+						//    otherwise, stay in advantage
+					}
+					break;
+				case GameState::END:
+					// restarting
+					if (p.controls.start.pressed) nextState = GameState::STANDBY;
+					break;
+				default: // COUNTER, STANDBY
+					// your inputs don't matter lol
+					break;
 			}
 
-			//damp perpendicular velocity:
-			float perp = glm::dot(p.velocity, glm::vec2(-dir.y, dir.x));
-			perp = glm::mix(perp, 0.0f, amt);
-
-			p.velocity = dir * along + glm::vec2(-dir.y, dir.x) * perp;
-		}
-		p.position += p.velocity * elapsed;
-
-		//reset 'downs' since controls have been handled:
-		p.controls.left.downs = 0;
-		p.controls.right.downs = 0;
-		p.controls.up.downs = 0;
-		p.controls.down.downs = 0;
-		p.controls.jump.downs = 0;
-	}
-
-	//collision resolution:
-	for (auto &p1 : players) {
-		//player/player collisions:
-		for (auto &p2 : players) {
-			if (&p1 == &p2) break;
-			glm::vec2 p12 = p2.position - p1.position;
-			float len2 = glm::length2(p12);
-			if (len2 > (2.0f * PlayerRadius) * (2.0f * PlayerRadius)) continue;
-			if (len2 == 0.0f) continue;
-			glm::vec2 dir = p12 / std::sqrt(len2);
-			//mirror velocity to be in separating direction:
-			glm::vec2 v12 = p2.velocity - p1.velocity;
-			glm::vec2 delta_v12 = dir * glm::max(0.0f, -1.75f * glm::dot(dir, v12));
-			p2.velocity += 0.5f * delta_v12;
-			p1.velocity -= 0.5f * delta_v12;
-		}
-		//player/arena collisions:
-		if (p1.position.x < ArenaMin.x + PlayerRadius) {
-			p1.position.x = ArenaMin.x + PlayerRadius;
-			p1.velocity.x = std::abs(p1.velocity.x);
-		}
-		if (p1.position.x > ArenaMax.x - PlayerRadius) {
-			p1.position.x = ArenaMax.x - PlayerRadius;
-			p1.velocity.x =-std::abs(p1.velocity.x);
-		}
-		if (p1.position.y < ArenaMin.y + PlayerRadius) {
-			p1.position.y = ArenaMin.y + PlayerRadius;
-			p1.velocity.y = std::abs(p1.velocity.y);
-		}
-		if (p1.position.y > ArenaMax.y - PlayerRadius) {
-			p1.position.y = ArenaMax.y - PlayerRadius;
-			p1.velocity.y =-std::abs(p1.velocity.y);
+			//reset 'downs' since controls have been handled:
+			p.controls.left.downs = 0;
+			p.controls.right.downs = 0;
+			p.controls.up.downs = 0;
+			p.controls.down.downs = 0;
+			p.controls.jump.downs = 0;
+			p.controls.start.downs = 0;
 		}
 	}
 
+	// game state -> game state
+	// Actual game state updates, including player inputs affects on self
+	gameState = nextState;
+	switch (gameState) {
+		case GameState::STANDBY:
+			if (Player::activePlayerCount == 2) {
+				std::random_device rd;
+				std::mt19937 gen(rd());
+				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(gen);
+				gameState = GameState::NEUTRAL; // will begin next frame
+			}
+			break;
+		case GameState::NEUTRAL:
+			// trigger and false start timers, and false start triggers
+			// if trigger timer is done, set up TRIGGER state with direction
+
+			// Start Trigger
+			if (triggerDelay <= 0) {
+				triggerDirection = (TriggerDirection)(1 << (rand() % 4)); // 0 to 3
+				gameState = GameState::TRIGGER; // will begin next frame
+			}
+			else
+				triggerDelay = std::clamp(triggerDelay - elapsed, 0.0f, triggerDelay);
+			break;
+		case GameState::TRIGGER:
+			// people pressed buttons
+			if (correctHits == 1) {
+				lastPosition = progress;
+				for (auto &p : players) {
+					if (p.activePlayer && p.advantage && p.penalty <= 0) {
+						tugDirection = p.advantageDirection;
+					}
+				}
+				gameState = GameState::ADVANTAGE;
+			}
+			else if (correctHits == 2) {
+				TriggerDirection newDir;
+				do {
+					newDir = (TriggerDirection)(1 << (rand() % 4));
+				} while (newDir == triggerDirection);
+				triggerDirection = newDir;
+			}
+
+			break;
+		case GameState::ADVANTAGE:
+			if (abs(progress) > ArenaMax.x) {
+				// VICTORY!
+				gameState = GameState::END;
+			}
+			else {
+				progress += tugDirection * TUG_SPEED;
+			}
+			break;
+		case GameState::COUNTER:
+			// Roll progress back until it reaches lastPosition
+			if (progress == lastPosition) {
+				gameState = GameState::NEUTRAL;
+				tugDirection = 0;
+
+				// advantage state
+				for (auto &p : players) {
+					if (p.activePlayer) {
+						p.advantage = false;
+					}
+				}
+			}
+			else {
+				if (tugDirection < 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), progress, lastPosition);
+				else if (tugDirection > 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), lastPosition, progress);
+			}
+			break;
+		default: // END
+			// nothing else should happen
+			break;
+	}
+
+	// Penalty Timers (happens regardless of state)
+	for (auto &p : players) {
+		if (p.activePlayer) {
+			if (p.inputs.size() < 1) {
+				p.penalty = std::clamp(p.penalty - elapsed, 0.0f, p.penalty);
+			}
+			// Reset input list in player
+			p.inputs.clear();
+		}
+	}
 }
 
 

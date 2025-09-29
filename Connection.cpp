@@ -45,6 +45,7 @@ typedef int ssize_t;
 //Also, some help and examples for getaddrinfo from: https://beej.us/guide/bgnet/html/multi/syscalls.html
 
 
+// proxy out to close sock function
 void Connection::close() {
 	if (socket != InvalidSocket) {
 		::closesocket(socket);
@@ -89,6 +90,8 @@ void poll_connections(
 		tv.tv_sec = std::lround(std::floor(timeout));
 		tv.tv_usec = std::lround((timeout - std::floor(timeout)) * 1e6);
 		//NOTE: on windows nfds is ignored -- https://msdn.microsoft.com/en-us/library/windows/desktop/ms740141(v=vs.85).aspx
+		
+		//wait for either time or when something happpens (when something is available to read)
 		int ret = select(max + 1, &read_fds, &write_fds, NULL, &tv);
 
 		if (ret < 0) {
@@ -129,7 +132,7 @@ void poll_connections(
 
 		while (true) { //read until more data left to read
 			ssize_t ret = recv(c.socket, buffer, BufferSize, MSG_DONTWAIT);
-			if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+			if (ret < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) { // if you haven't received bytes I asked for, just keep going
 				//~no problem~ but no data
 				break;
 			} else if (ret <= 0 || ret > (ssize_t)BufferSize) {
@@ -152,13 +155,13 @@ void poll_connections(
 		}
 	}
 
-	//process responses:
+	//process responses (reading and writing):
 	for (auto &c : connections) {
 		//don't bother with connections unless they are valid, have something to send, and are marked writable:
 		if (c.socket == InvalidSocket || c.send_buffer.empty() || !FD_ISSET(c.socket, &write_fds)) continue;
 		
 		#ifdef _WIN32
-		ssize_t ret = send(c.socket, reinterpret_cast< char const * >(c.send_buffer.data()), int(c.send_buffer.size()), MSG_DONTWAIT);
+		ssize_t ret = send(c.socket, reinterpret_cast< char const * >(c.send_buffer.data()), int(c.send_buffer.size()), MSG_DONTWAIT); // if you can't send all, don't wait
 		#else
 		ssize_t ret = send(c.socket, reinterpret_cast< char const * >(c.send_buffer.data()), c.send_buffer.size(), MSG_DONTWAIT);
 		#endif 
@@ -195,7 +198,7 @@ Server::Server(std::string const &port) {
 	}
 	#endif
 
-	{ //use getaddrinfo to look up how to bind to port:
+	{ //use getaddrinfo to look up how to bind to port (this is the "make socket" portion):
 		struct addrinfo hints;
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_UNSPEC;
@@ -227,7 +230,8 @@ Server::Server(std::string const &port) {
 				}
 				std::cout << "... "; std::cout.flush();
 			}
-
+			
+			// make the socket
 			Socket s = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
 			if (s == InvalidSocket) {
 				std::cout << "(failed to create socket: " << strerror(errno) << ")" << std::endl;
@@ -330,11 +334,13 @@ Client::Client(std::string const &host, std::string const &port) : connections(1
 				std::cout << "... "; std::cout.flush();
 			}
 
+			// make the socket:
 			Socket s = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
 			if (s == InvalidSocket) {
 				std::cout << "(failed to create socket: " << strerror(errno) << ")" << std::endl;
 				continue;
 			}
+			// connec the socket:
 			int ret = connect(s, info->ai_addr, int(info->ai_addrlen));
 			if (ret < 0) {
 				std::cout << "(failed to connect: " << strerror(errno) << ")" << std::endl;
