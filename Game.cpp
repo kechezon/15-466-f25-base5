@@ -186,7 +186,7 @@ void Game::update(float elapsed) {
 						// 	if pressing the same button, set nextState to NEUTRAL
 						// 	otherwise, stay in advantage
 						// otherwise:
-						//	if pressing the counter button, set nextState to COUNTER
+						//	if pressing the counter button, set nextState to COUNTER, set counterBonus to abs(progress - lastPosition) / 2
 						//    otherwise, stay in advantage
 					}
 					break;
@@ -229,6 +229,7 @@ void Game::update(float elapsed) {
 			if (triggerDelay <= 0) {
 				triggerDirection = (TriggerDirection)(1 << (rand() % 4)); // 0 to 3
 				gameState = GameState::TRIGGER; // will begin next frame
+				lastPosition = progress;
 			}
 			else
 				triggerDelay = std::clamp(triggerDelay - elapsed, 0.0f, triggerDelay);
@@ -236,7 +237,6 @@ void Game::update(float elapsed) {
 		case GameState::TRIGGER:
 			// people pressed buttons
 			if (correctHits == 1) {
-				lastPosition = progress;
 				for (auto &p : players) {
 					if (p.activePlayer && p.advantage && p.penalty <= 0) {
 						tugDirection = p.advantageDirection;
@@ -276,8 +276,8 @@ void Game::update(float elapsed) {
 				}
 			}
 			else {
-				if (tugDirection < 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), progress, lastPosition);
-				else if (tugDirection > 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), lastPosition, progress);
+				if (tugDirection < 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), progress, lastPosition + counterBonus);
+				else if (tugDirection > 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), lastPosition - counterBonus, progress);
 			}
 			break;
 		default: // END

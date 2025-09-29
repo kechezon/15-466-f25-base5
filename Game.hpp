@@ -97,6 +97,7 @@ struct Game {
 	//progress variables and visuals
 	float progress = 0.0f; // need to reach one of the arena bounds
 	float lastPosition = 0.0f; // during COUNTER, revert back to this
+	float counterBonus = 0.0f; // plus 50% of progress made
 	const float TUG_SPEED = 0.5f; // units per second
 	int tugDirection = 0;
 
@@ -114,10 +115,13 @@ struct Game {
 		DOWN = 0b1000
 	} triggerDirection = LEFT;
 
-	// false start penalties
-	const float FS_PENALTY_MIN = 6.0f; // how to use: apply penalty
-	const float FS_PENALTY_MAX = 8.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
-									   // penalty does not go down if you're pressing a button (anti-mash)
+	// false starts and wrong direction penalties
+	const float FS_PENALTY_NEUTRAL_MIN = 6.0f; // how to use: apply penalty
+	const float FS_PENALTY_NEUTRAL MAX = 8.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
+									   		   // penalty does not go down if you're pressing a button (anti-mash)
+	const float WD_PENALTY_ACTIVE_MIN = 0.2f; // how to use: apply penalty
+	const float WD_PENALTY_ACTIVE_MAX = 0.45f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
+									   		   // penalty does not go down if you're pressing a button (anti-mash)
 
 	//---- communication helpers ----
 
