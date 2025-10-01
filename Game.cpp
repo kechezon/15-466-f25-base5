@@ -355,22 +355,31 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	connection.send(uint8_t(0));
 	connection.send(uint8_t(0));
 	connection.send(uint8_t(0));
-	size_t mark = connection.send_buffer.size(); //keep track of this position in the buffer
+	size_t mark = connection.send_buffer.size(); //keep track of this position in the buffer (mark is currently 3)
 
 
 	//send player info helper:
+	// TODO: update with new player info
 	auto send_player = [&](Player const &player) {
-		connection.send(player.position);
-		connection.send(player.velocity);
-		connection.send(player.color);
+		// connection.send(player.position);
+		// connection.send(player.velocity);
+		// connection.send(player.color);
 
 		connection.send(player.playerNumber);
-	
+		connection.send(player.activePlayer);
+		connection.send(Player::activePlayerCount);
+		connection.send(player.advantageDirection);
+
+		connection.send(player.penalty);
+		connection.send(player.advantage);
+
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
 		//effectively: truncates player name to 255 chars
 		uint8_t len = uint8_t(std::min< size_t >(255, player.name.size()));
 		connection.send(len);
 		connection.send_buffer.insert(connection.send_buffer.end(), player.name.begin(), player.name.begin() + len);
+
+		// TODO: figure out if I need to send inputs and how
 	};
 
 	//player count:
@@ -383,9 +392,9 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
-	connection.send_buffer[mark-3] = uint8_t(size);
-	connection.send_buffer[mark-2] = uint8_t(size >> 8);
-	connection.send_buffer[mark-1] = uint8_t(size >> 16);
+	connection.send_buffer[mark-3] = uint8_t(size); // 0: size (lops off leading beyond 8)
+	connection.send_buffer[mark-2] = uint8_t(size >> 8); // 1: size (lops off leading 16, and last 8)
+	connection.send_buffer[mark-1] = uint8_t(size >> 16); // 2: size (lops of leading beyond 24, and last 16)
 }
 
 bool Game::recv_state_message(Connection *connection_) {
@@ -415,20 +424,22 @@ bool Game::recv_state_message(Connection *connection_) {
 	uint8_t player_count;
 	read(&player_count);
 	for (uint8_t i = 0; i < player_count; ++i) {
-		players.emplace_back();
-		Player &player = players.back();
-		read(&player.position);
-		read(&player.velocity);
-		read(&player.color);
-		uint8_t name_len;
-		read(&name_len);
-		//n.b. would probably be more efficient to directly copy from recv_buffer, but I think this is clearer:
-		player.name = "";
-		for (uint8_t n = 0; n < name_len; ++n) {
-			char c;
-			read(&c);
-			player.name += c;
-		}
+		// TODO: read bytes back to construct player
+
+		// players.emplace_back();
+		// Player &player = players.back();
+		// read(&player.position);
+		// read(&player.velocity);
+		// read(&player.color);
+		// uint8_t name_len;
+		// read(&name_len);
+		// //n.b. would probably be more efficient to directly copy from recv_buffer, but I think this is clearer:
+		// player.name = "";
+		// for (uint8_t n = 0; n < name_len; ++n) {
+		// 	char c;
+		// 	read(&c);
+		// 	player.name += c;
+		// }
 	}
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");

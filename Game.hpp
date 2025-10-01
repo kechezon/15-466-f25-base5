@@ -46,16 +46,14 @@ struct Player {
 	// set up info
 	int playerNumber = -1; // 0-indexed
 	bool activePlayer = false; // if not an activePlayer, then you're a spectator
-	float penalty = 0.0f; // false starts add to penalty
 	inline static int activePlayerCount = 0;
-
-	// dynamic gameplay information
-	bool advantage = false;
 	int advantageDirection = 0;
-	std::vector<Button*> inputs = {}; // cleared each frame
-
 	std::string name = "";
 
+	// dynamic gameplay information
+	float penalty = 0.0f; // false starts add to penalty
+	bool advantage = false;
+	std::vector<Button*> inputs = {}; // cleared each frame
 };
 
 struct Game {
