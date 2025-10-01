@@ -1,5 +1,8 @@
 #include "PlayMode.hpp"
 
+#include "LitColorTextureProgram.hpp"
+#include "ColorTextureProgram.hpp"
+
 #include "DrawLines.hpp"
 #include "gl_errors.hpp"
 #include "data_path.hpp"
@@ -12,7 +15,62 @@
 #include <random>
 #include <array>
 
-PlayMode::PlayMode(Client &client_) : client(client_) {
+/**************************************************************
+ * Scene loading code based on starter code from Game2 onwards
+ **************************************************************/
+Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
+	return new Scene(data_path("quicktug.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+		Mesh const &mesh = hexapod_meshes->lookup(mesh_name);
+
+		scene.drawables.emplace_back(transform);
+		Scene::Drawable &drawable = scene.drawables.back();
+
+		drawable.pipeline = lit_color_texture_program_pipeline;
+
+		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
+		drawable.pipeline.type = mesh.type;
+		drawable.pipeline.start = mesh.start;
+		drawable.pipeline.count = mesh.count;
+
+	});
+});
+
+/***********************************
+ * Scene copying code based on
+ * starter code from Game 2 onwards 
+ ***********************************/
+PlayMode::PlayMode(Client &client_) : scene(*quicktug_scene), client(client_) {
+	for (auto &transform : scene.transforms) {
+		if (transform.name == "Rope.FL") rope = &transform;
+		else if (transform.name == "P1.FL") p1_hands = &transform;
+		else if (transform.name == "P2.FL") p2_hands = &transform;
+		else if (transform.name == "P1LightOff.FL") p1_light_off = &transform;
+		else if (transform.name == "P1LightOn.FL") p1_light_on = &transform;
+		else if (transform.name == "P2LightOff.FL") p2_light_off = &transform;
+		else if (transform.name == "P2LightOn.FL") p2_light_on = &transform;
+		else if (transform.name == "EmptyBox.FL") empty_box = &transform;
+		else if (transform.name == "TriggerBox.FL") trigger_box = &transform;
+		else if (transform.name == "AdvantageBoxP1.FL") adv_box_p1 = &transform;
+		else if (transform.name == "AdvantageBoxP2.FL") adv_box_p2 = &transform;
+		else if (transform.name == "CounterBox.FL") counter_box = &transform;
+	}
+
+	if (rope == nullptr) throw std::runtime_error("Rope not found.");
+	if (p1_hands == nullptr) throw std::runtime_error("P1 Hands not found.");
+	if (p2_hands == nullptr) throw std::runtime_error("P2 Hands not found.");
+	if (p1_light_off == nullptr) throw std::runtime_error("P1 Light (Off) not found.");
+	if (p1_light_on == nullptr) throw std::runtime_error("P1 Light (On) not found.");
+	if (p2_light_off == nullptr) throw std::runtime_error("P2 Light (Off) not found.");
+	if (p2_light_on == nullptr) throw std::runtime_error("P2 Light (On) not found.");
+	if (empty_box == nullptr) throw std::runtime_error("Empty Box not found.");
+	if (trigger_box == nullptr) throw std::runtime_error("Trigger Box not found.");
+	if (adv_box_p1 == nullptr) throw std::runtime_error("P1 Advantage Box not found.");
+	if (adv_box_p2 == nullptr) throw std::runtime_error("P2 Advantage Box not found.");
+	if (counter_box == nullptr) throw std::runtime_error("Counter Box not found.");
+
+	//get pointer to camera for convenience:
+	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
+	camera = &scene.cameras.front();
 }
 
 PlayMode::~PlayMode() {
@@ -65,6 +123,8 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 
 	return false;
 }
+
+
 
 void PlayMode::update(float elapsed) {
 
@@ -135,6 +195,96 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	{
 		DrawLines lines(world_to_clip);
 
+		// Set rope, hand positions, and off-lights
+		rope->position = glm::vec3(game.progress, 0.0f, ROPE_HEIGHT);
+
+		if (Player::activePlayerCount >= 1) {
+			p1_hands->position = glm::vec3(game.progress - HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
+			p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+
+			if (Player::activePlayerCount == 2) {
+				p2_hands->position = glm::vec3(game.progress + HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				p2_hands->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+			}
+		}
+
+		// Set offscreen box and light positions
+		empty_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		trigger_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		adv_box_p1->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		adv_box_p2->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		counter_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		p1_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		p2_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+
+		// TODO: Set trigger box and other models based on game state
+		switch (game.gameState) {
+			case Game::GameState::STANDBY:
+				// empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				break;
+			case Game::GameState::NEUTRAL:
+				empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				break;
+			case Game::GameState::TRIGGER:
+				float angle = 0.0f;
+				if (game.triggerDirection == Game::TriggerDirection::LEFT) angle = 90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::RIGHT) angle = -90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::DOWN) angle = 180.0f;
+
+				trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				trigger_box->rotation = glm::quat(1.0f, 0.0f, angle, 0.0f);
+				break;
+			case Game::GameState::ADVANTAGE:
+				// Trigger Box and Light need to be brought into the fold
+				Scene::Transform *adv_box;
+				Scene::Transform *adv_light;
+				Scene::Transform *adv_off;
+				int adv_dir = 0;
+				float angle = 0.0f;
+
+				for (auto const &player : game.players) { // find who has advantage
+					if (player.advantageDirection < 0) {
+						assert(player.activePlayer);
+						adv_box = adv_box_p1;
+						adv_light = p1_light_on;
+						adv_off = p1_light_off;
+						break;
+					}
+					else if (player.advantageDirection > 0) {
+						assert(player.activePlayer);
+						adv_box = adv_box_p2;
+						adv_light = p2_light_on;
+						adv_off = p2_light_off;
+						break;
+					}
+				}
+				assert(adv_box != nullptr);
+				assert(adv_light != nullptr);
+				assert(adv_off != nullptr);
+				assert(adv_dir != 0);
+
+				if (game.triggerDirection == Game::TriggerDirection::LEFT) angle = 90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::RIGHT) angle = -90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::DOWN) angle = 180.0f;
+
+				adv_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				adv_box->rotation = glm::quat(1.0f, 0.0f, angle, 0.0f);
+				adv_light->position = glm::vec3(game.progress + (LIGHT_OFFSET_X * adv_dir), 0.0f, ROPE_HEIGHT);
+				adv_off->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+				break;
+			case Game::GameState::COUNTER:
+				trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				p1_light_on = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				p1_light_off = glm::vec3(0.0f, 0.0f, ArenaMax.y * 2);
+				p2_light_on = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				p2_light_off = glm::vec3(0.0f, 0.0f, ArenaMax.y * 2);
+				break;
+			case Game::GameState::END:
+				break;
+		}
+
+		// DEBUG:
+
 		//helper:
 		auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
 			lines.draw_text(text,
@@ -153,7 +303,9 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 
-		for (auto const &player : game.players) {
+
+
+		/*for (auto const &player : game.players) {
 			glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
 			if (&player == &game.players.front()) {
 				//mark current player (which server sends first):
@@ -177,7 +329,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			}
 
 			draw_text(player.position + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), player.name, 0.09f);
-		}
+		}*/
 	}
 	GL_ERRORS();
 }

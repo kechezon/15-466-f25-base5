@@ -39,21 +39,23 @@ struct Player {
 	} controls;
 
 	//player state (sent from server):
-	std::vector<Button*> inputs = {}; // cleared each frame
-
 	glm::vec2 position = glm::vec2(0.0f, 0.0f);
 	glm::vec2 velocity = glm::vec2(0.0f, 0.0f);
-	bool advantage = false;
-	int advantageDirection = 0;
-
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
-	std::string name = "";
 
 	// set up info
 	int playerNumber = -1; // 0-indexed
 	bool activePlayer = false; // if not an activePlayer, then you're a spectator
 	float penalty = 0.0f; // false starts add to penalty
 	inline static int activePlayerCount = 0;
+
+	// dynamic gameplay information
+	bool advantage = false;
+	int advantageDirection = 0;
+	std::vector<Button*> inputs = {}; // cleared each frame
+
+	std::string name = "";
+
 };
 
 struct Game {
@@ -61,6 +63,7 @@ struct Game {
 	Player *spawn_player(); //add player the end of the players list (may also, e.g., play some spawn anim)
 	void remove_player(Player *); //remove player from game (may also, e.g., play some despawn anim)
 	bool make_player_active(Player *);
+	int winner = -1; // 0 or 1
 
 	std::mt19937 mt; //used for spawning players
 	uint32_t next_player_number = 1; //used for naming players
@@ -75,6 +78,8 @@ struct Game {
 	inline static constexpr float Tick = 1.0f / 30.0f;
 
 	//arena size:
+	inline static constexpr glm::vec2 ArenaMin_Clip = glm::vec2(-1.5f, -1.0f);
+	inline static constexpr glm::vec2 ArenaMax_Clip = glm::vec2( 1.5f,  1.0f);
 	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-1.5f, -1.0f);
 	inline static constexpr glm::vec2 ArenaMax = glm::vec2( 1.5f,  1.0f);
 
@@ -90,7 +95,6 @@ struct Game {
 		TRIGGER, // prompt is here!
 		ADVANTAGE, // someone started pulling
 		COUNTER, // ...but the other player countered! start pulling back
-		TIE, // hold on tie for a second (TODO: reduce trigger time)
 		END
 	} gameState = STANDBY;
 
@@ -100,6 +104,10 @@ struct Game {
 	float counterBonus = 0.0f; // plus 50% of progress made
 	const float TUG_SPEED = 0.5f; // units per second
 	int tugDirection = 0;
+
+	// randomizer needs
+	std::random_device rd;
+	std::mt19937 gen(rd());
 
 	//QTE triggers:
 	const float TRIGGER_MIN_TIME = 3.0f;
@@ -117,10 +125,10 @@ struct Game {
 
 	// false starts and wrong direction penalties
 	const float FS_PENALTY_NEUTRAL_MIN = 6.0f; // how to use: apply penalty
-	const float FS_PENALTY_NEUTRAL MAX = 8.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
+	const float FS_PENALTY_NEUTRAL_MAX = 8.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
 									   		   // penalty does not go down if you're pressing a button (anti-mash)
-	const float WD_PENALTY_ACTIVE_MIN = 0.2f; // how to use: apply penalty
-	const float WD_PENALTY_ACTIVE_MAX = 0.45f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
+	const float WD_PENALTY_ACTIVE_MIN = 0.3f; // how to use: apply penalty
+	const float WD_PENALTY_ACTIVE_MAX = 1.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
 									   		   // penalty does not go down if you're pressing a button (anti-mash)
 
 	//---- communication helpers ----

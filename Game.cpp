@@ -95,15 +95,15 @@ Player *Game::spawn_player() {
 	Player &player = players.back();
 
 	//random point in the middle area of the arena:
-	player.position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
-	player.position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+	// player.position.x = glm::mix(ArenaMin_Clip.x + 2.0f * PlayerRadius, ArenaMax_Clip.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+	// player.position.y = glm::mix(ArenaMin_Clip.y + 2.0f * PlayerRadius, ArenaMax_Clip.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 
-	do {
-		player.color.r = mt() / float(mt.max());
-		player.color.g = mt() / float(mt.max());
-		player.color.b = mt() / float(mt.max());
-	} while (player.color == glm::vec3(0.0f));
-	player.color = glm::normalize(player.color);
+	// do {
+	// 	player.color.r = mt() / float(mt.max());
+	// 	player.color.g = mt() / float(mt.max());
+	// 	player.color.b = mt() / float(mt.max());
+	// } while (player.color == glm::vec3(0.0f));
+	// player.color = glm::normalize(player.color);
 
 	player.name = "Player " + std::to_string(next_player_number);
 	player.playerNumber = next_player_number++;
@@ -111,12 +111,11 @@ Player *Game::spawn_player() {
 	// Limit to two players (beyond that are spectators)
 	if (Player::activePlayerCount < 2) {
 		make_player_active(&player);
-
 		std::cout << "Spawned Player " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
 	}
 	else {
-		player.position.x = ArenaMin.x - ((ArenaMax.x - ArenaMin.x) / 2);
-		player.position.y = ArenaMin.y - ((ArenaMax.y - ArenaMin.y) / 2);
+		// player.position.x = ArenaMin.x - ((ArenaMax_Clip.x - ArenaMin_Clip.x) / 2);
+		// player.position.y = ArenaMin_Clip.y - ((ArenaMax_Clip.y - ArenaMin_Clip.y) / 2);
 		player.activePlayer = false;
 		std::cout << "Spawned Spectator " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
 	}
@@ -137,8 +136,8 @@ void Game::remove_player(Player *player) {
 				nextPlayer++;
 				if (nextPlayer != players.end() && !(nextPlayer->activePlayer)) {
 					make_player_active(&*player);
-					nextPlayer->position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
-					nextPlayer->position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+					// nextPlayer->position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+					// nextPlayer->position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 					std::cout << "Player " << nextPlayer->playerNumber << " jumped in!" << std::endl;
 				}
 				std::cout << "Removed Player " << pi->playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
@@ -163,9 +162,16 @@ void Game::update(float elapsed) {
 	int correctHits = 0;
 	GameState nextState = gameState;
 
+	// if someone has a false start, you false starting should not end sooner
+	float shortestFalseStart = TRIGGER_MAX_TIME;
+	for (auto &p : players) {
+		shortestFalseStart = std::min(shortestFalseStart, p.penalty);
+	}
+	float falseStartPenalty =
+		(std::uniform_real_distribution<float>(std::max(TRIGGER_MIN_TIME, shortestFalseStart), TRIGGER_MAX_TIME))(gen);
+
 	for (auto &p : players) {
 		if (p.activePlayer) {
-			p.inputs.clear();
 			if (p.controls.left.pressed) p.inputs.emplace_back(&(p.controls.left));
 			if (p.controls.right.pressed) p.inputs.emplace_back(&(p.controls.right));
 			if (p.controls.down.pressed) p.inputs.emplace_back(&(p.controls.down));
@@ -173,21 +179,62 @@ void Game::update(float elapsed) {
 
 			switch (gameState) {
 				case GameState::NEUTRAL:
-					// TODO: any inputs should trigger a false start
+					if (p.inputs.size() > 0 && p.penalty <= 0) p.penalty = falseStartPenalty;
 					break;
 				case GameState::TRIGGER:
-					// TODO: if the player is pressing the correct button and has no penalty, increment correctHits and set advantage
-					// 		 otherwise, any incorrect inputs should trigger a false start 
+					// if the player is pressing the correct button and has no penalty, increment correctHits
+					//   otherwise, any incorrect inputs should trigger a false start
+					if (p.penalty <= 0) { // only care about player inputs when not under penalty
+						if (p.inputs.size() > 1) {
+							p.penalty = falseStartPenalty;
+						}
+						else if (p.inputs.size() == 1) {
+							if ((p.inputs[0] == &(p.controls.left) && triggerDirection == TriggerDirection::LEFT) ||
+								(p.inputs[0] == &(p.controls.right) && triggerDirection == TriggerDirection::RIGHT) ||
+								(p.inputs[0] == &(p.controls.up) && triggerDirection == TriggerDirection::UP) ||
+								(p.inputs[0] == &(p.controls.down) && triggerDirection == TriggerDirection::DOWN)) {
+								correctHits++;
+
+								if (correctHits == 1) {
+									p.advantage = true;
+								}
+							}
+							else
+								p.penalty = falseStartPenalty;
+						}
+					}
 					break;
 				case GameState::ADVANTAGE:
 					if (nextState != GameState::NEUTRAL) { // if next state is neutral, the advantaged player ended their tug
-						// TODO:
-						// if I have advantage:
-						// 	if pressing the same button, set nextState to NEUTRAL
+						if (p.advantage) { // if I have advantage:
+							// if pressing the same button, set nextState to NEUTRAL, and setup the triggerDelay
+							if (p.inputs.size() == 1) {
+								if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] == &(p.controls.left)) ||
+									(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] == &(p.controls.right)) ||
+									(triggerDirection == TriggerDirection::UP && p.inputs[0] == &(p.controls.up)) ||
+									(triggerDirection == TriggerDirection::DOWN && p.inputs[0] == &(p.controls.down)))	
+										nextState = GameState::NEUTRAL;
+							}
+						}
+						else { assert(!(p.advantage)); // if I'm the counterer
+							if (p.inputs.size() == 1) {
+							//	if pressing the counter button, set nextState to COUNTER, set counterBonus to abs(progress - lastPosition) / 2
+								if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] == &(p.controls.right)) ||
+									(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] == &(p.controls.left)) ||
+									(triggerDirection == TriggerDirection::UP && p.inputs[0] == &(p.controls.down)) ||
+									(triggerDirection == TriggerDirection::DOWN && p.inputs[0] == &(p.controls.up)))	
+										nextState = GameState::COUNTER;
+								// If you press a non-counter direction that's not the trigger
+								else if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] != &(p.controls.left)) ||
+										(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] != &(p.controls.right)) ||
+										(triggerDirection == TriggerDirection::UP && p.inputs[0] != &(p.controls.up)) ||
+										(triggerDirection == TriggerDirection::DOWN && p.inputs[0] != &(p.controls.down)))
+											p.penalty = falseStartPenalty / 4.0f;
+							}
+							else if (p.inputs.size() > 1)
+								p.penalty = falseStartPenalty / 4.0f;
+						}
 						// 	otherwise, stay in advantage
-						// otherwise:
-						//	if pressing the counter button, set nextState to COUNTER, set counterBonus to abs(progress - lastPosition) / 2
-						//    otherwise, stay in advantage
 					}
 					break;
 				case GameState::END:
@@ -215,8 +262,6 @@ void Game::update(float elapsed) {
 	switch (gameState) {
 		case GameState::STANDBY:
 			if (Player::activePlayerCount == 2) {
-				std::random_device rd;
-				std::mt19937 gen(rd());
 				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(gen);
 				gameState = GameState::NEUTRAL; // will begin next frame
 			}
@@ -241,6 +286,7 @@ void Game::update(float elapsed) {
 					if (p.activePlayer && p.advantage && p.penalty <= 0) {
 						tugDirection = p.advantageDirection;
 					}
+					p.penalty /= 4.0f;
 				}
 				gameState = GameState::ADVANTAGE;
 			}
@@ -251,6 +297,7 @@ void Game::update(float elapsed) {
 				} while (newDir == triggerDirection);
 				triggerDirection = newDir;
 			}
+			assert(correctHits <= 2);
 
 			break;
 		case GameState::ADVANTAGE:
@@ -276,8 +323,9 @@ void Game::update(float elapsed) {
 				}
 			}
 			else {
+				assert(tugDirection != 0);
 				if (tugDirection < 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), progress, lastPosition + counterBonus);
-				else if (tugDirection > 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), lastPosition - counterBonus, progress);
+				else progress = std::clamp(progress - (tugDirection * TUG_SPEED), lastPosition - counterBonus, progress);
 			}
 			break;
 		default: // END
@@ -315,6 +363,8 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		connection.send(player.position);
 		connection.send(player.velocity);
 		connection.send(player.color);
+
+		connection.send(player.playerNumber);
 	
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
 		//effectively: truncates player name to 255 chars
