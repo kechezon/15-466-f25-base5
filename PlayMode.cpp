@@ -4,6 +4,7 @@
 #include "ColorTextureProgram.hpp"
 
 #include "DrawLines.hpp"
+#include "Mesh.hpp"
 #include "gl_errors.hpp"
 #include "data_path.hpp"
 #include "hex_dump.hpp"
@@ -18,16 +19,23 @@
 /**************************************************************
  * Scene loading code based on starter code from Game2 onwards
  **************************************************************/
+GLuint quicktug_meshes_for_lit_color_texture_program = 0;
+Load< MeshBuffer > quicktug_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+	MeshBuffer const *ret = new MeshBuffer(data_path("quicktug.pnct"));
+	quicktug_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
+	return ret;
+});
+
 Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
 	return new Scene(data_path("quicktug.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		Mesh const &mesh = hexapod_meshes->lookup(mesh_name);
+		Mesh const &mesh = quicktug_meshes->lookup(mesh_name);
 
 		scene.drawables.emplace_back(transform);
 		Scene::Drawable &drawable = scene.drawables.back();
 
 		drawable.pipeline = lit_color_texture_program_pipeline;
 
-		drawable.pipeline.vao = hexapod_meshes_for_lit_color_texture_program;
+		drawable.pipeline.vao = quicktug_meshes_for_lit_color_texture_program;
 		drawable.pipeline.type = mesh.type;
 		drawable.pipeline.start = mesh.start;
 		drawable.pipeline.count = mesh.count;
@@ -97,10 +105,9 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			controls.down.downs += 1;
 			controls.down.pressed = true;
 			return true;
-		} else if (evt.key.key == SDLK_SPACE) {
-			controls.jump.downs += 1;
-			controls.jump.pressed = true;
-			return true;
+		} else if (evt.key.key == SDLK_ENTER || evt.key.key == SDLK_SPACE) {
+			controls.start.downs += 1;
+			controls.start.pressed = true;
 		}
 	} else if (evt.type == SDL_EVENT_KEY_UP) {
 		if (evt.key.key == SDLK_A) {
@@ -115,8 +122,8 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		} else if (evt.key.key == SDLK_S) {
 			controls.down.pressed = false;
 			return true;
-		} else if (evt.key.key == SDLK_SPACE) {
-			controls.jump.pressed = false;
+		} else if (evt.key.key == SDLK_ENTER || evt.key.key == SDLK_SPACE) {
+			controls.start.pressed = false;
 			return true;
 		}
 	}
@@ -136,7 +143,7 @@ void PlayMode::update(float elapsed) {
 	controls.right.downs = 0;
 	controls.up.downs = 0;
 	controls.down.downs = 0;
-	controls.jump.downs = 0;
+	controls.start.downs = 0;
 
 	//send/receive data:
 	client.poll([this](Connection *c, Connection::Event event){
@@ -218,7 +225,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		p2_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
 
 		// TODO: Set trigger box and other models based on game state
-		switch (game.gameState) {
+		float box_angle = 0.0f;
+		Scene::Transform *adv_box = nullptr;
+		Scene::Transform *adv_light = nullptr;
+		Scene::Transform *adv_off = nullptr;
+		int adv_dir = 0;
+		switch (game.matchState) {
 			case Game::GameState::STANDBY:
 				// empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
 				break;
@@ -226,21 +238,15 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
 				break;
 			case Game::GameState::TRIGGER:
-				float angle = 0.0f;
-				if (game.triggerDirection == Game::TriggerDirection::LEFT) angle = 90.0f;
-				else if (game.triggerDirection == Game::TriggerDirection::RIGHT) angle = -90.0f;
-				else if (game.triggerDirection == Game::TriggerDirection::DOWN) angle = 180.0f;
+				if (game.triggerDirection == Game::TriggerDirection::LEFT) box_angle = 90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::RIGHT) box_angle = -90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::DOWN) box_angle = 180.0f;
 
 				trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
-				trigger_box->rotation = glm::quat(1.0f, 0.0f, angle, 0.0f);
+				trigger_box->rotation = glm::quat(1.0f, 0.0f, box_angle, 0.0f);
 				break;
 			case Game::GameState::ADVANTAGE:
 				// Trigger Box and Light need to be brought into the fold
-				Scene::Transform *adv_box;
-				Scene::Transform *adv_light;
-				Scene::Transform *adv_off;
-				int adv_dir = 0;
-				float angle = 0.0f;
 
 				for (auto const &player : game.players) { // find who has advantage
 					if (player.advantageDirection < 0) {
@@ -263,21 +269,21 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				assert(adv_off != nullptr);
 				assert(adv_dir != 0);
 
-				if (game.triggerDirection == Game::TriggerDirection::LEFT) angle = 90.0f;
-				else if (game.triggerDirection == Game::TriggerDirection::RIGHT) angle = -90.0f;
-				else if (game.triggerDirection == Game::TriggerDirection::DOWN) angle = 180.0f;
+				if (game.triggerDirection == Game::TriggerDirection::LEFT) box_angle = 90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::RIGHT) box_angle = -90.0f;
+				else if (game.triggerDirection == Game::TriggerDirection::DOWN) box_angle = 180.0f;
 
 				adv_box->position = glm::vec3(0.0f, 0.0f, box_height);
-				adv_box->rotation = glm::quat(1.0f, 0.0f, angle, 0.0f);
+				adv_box->rotation = glm::quat(1.0f, 0.0f, box_angle, 0.0f);
 				adv_light->position = glm::vec3(game.progress + (LIGHT_OFFSET_X * adv_dir), 0.0f, ROPE_HEIGHT);
-				adv_off->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+				adv_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
 			case Game::GameState::COUNTER:
 				trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
-				p1_light_on = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-				p1_light_off = glm::vec3(0.0f, 0.0f, ArenaMax.y * 2);
-				p2_light_on = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-				p2_light_off = glm::vec3(0.0f, 0.0f, ArenaMax.y * 2);
+				p1_light_on->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				p1_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				p2_light_on->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
 			case Game::GameState::END:
 				break;

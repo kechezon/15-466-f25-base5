@@ -28,7 +28,7 @@ struct Button {
 struct Player {
 	//player inputs (sent from client):
 	struct Controls {
-		Button left, right, up, down, jump, start;
+		Button left, right, up, down, start;
 
 		void send_controls_message(Connection *connection) const;
 
@@ -88,13 +88,13 @@ struct Game {
 	
 	//game state
 	enum GameState {
-		STANDBY, // less than two players connected
-		NEUTRAL, // two players, waiting for a cue
-		TRIGGER, // prompt is here!
-		ADVANTAGE, // someone started pulling
-		COUNTER, // ...but the other player countered! start pulling back
-		END
-	} gameState = STANDBY;
+		STANDBY = 0b000001, // less than two players connected
+		NEUTRAL = 0b000010, // two players, waiting for a cue
+		TRIGGER = 0b000100, // prompt is here!
+		ADVANTAGE = 0b001000, // someone started pulling
+		COUNTER = 0b010000, // ...but the other player countered! start pulling back
+		END = 0b100000
+	} matchState = STANDBY;
 
 	//progress variables and visuals
 	float progress = 0.0f; // need to reach one of the arena bounds
@@ -103,9 +103,8 @@ struct Game {
 	const float TUG_SPEED = 0.5f; // units per second
 	int tugDirection = 0;
 
-	// randomizer needs
+	// randomizer needs (from cpp documentation)
 	std::random_device rd;
-	std::mt19937 gen(rd());
 
 	//QTE triggers:
 	const float TRIGGER_MIN_TIME = 3.0f;
@@ -124,9 +123,6 @@ struct Game {
 	// false starts and wrong direction penalties
 	const float FS_PENALTY_NEUTRAL_MIN = 6.0f; // how to use: apply penalty
 	const float FS_PENALTY_NEUTRAL_MAX = 8.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
-									   		   // penalty does not go down if you're pressing a button (anti-mash)
-	const float WD_PENALTY_ACTIVE_MIN = 0.3f; // how to use: apply penalty
-	const float WD_PENALTY_ACTIVE_MAX = 1.0f; // std::uniform_real_distribution<float>(FS_PENALTY_MIN, FS_PENALTY_MAX);
 									   		   // penalty does not go down if you're pressing a button (anti-mash)
 
 	//---- communication helpers ----

@@ -31,8 +31,9 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	send_button(right);
 	send_button(up);
 	send_button(down);
-	send_button(jump);
+	send_button(start);
 }
+
 
 bool Player::Controls::recv_controls_message(Connection *connection_) {
 	assert(connection_);
@@ -65,7 +66,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	recv_button(recv_buffer[4+1], &right);
 	recv_button(recv_buffer[4+2], &up);
 	recv_button(recv_buffer[4+3], &down);
-	recv_button(recv_buffer[4+4], &jump);
+	recv_button(recv_buffer[4+4], &start);
 
 	//delete message from buffer:
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + 4 + size);
@@ -87,6 +88,8 @@ bool Game::make_player_active(Player *player) {
 	if (Player::activePlayerCount == 0) player->advantageDirection = -1;
 	else player->advantageDirection = 1;
 	Player::activePlayerCount++;
+	player->advantage = false;
+	player->penalty = 0.0f;
 	return true;
 }
 
@@ -120,7 +123,7 @@ Player *Game::spawn_player() {
 		std::cout << "Spawned Spectator " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
 	}
 
-	gameState = Player::activePlayerCount >= 2 ? GameState::NEUTRAL : GameState::NEUTRAL;
+	matchState = Player::activePlayerCount >= 2 ? GameState::NEUTRAL : GameState::NEUTRAL;
 
 	return &player;
 }
@@ -135,7 +138,10 @@ void Game::remove_player(Player *player) {
 				auto nextPlayer = pi;
 				nextPlayer++;
 				if (nextPlayer != players.end() && !(nextPlayer->activePlayer)) {
-					make_player_active(&*player);
+					make_player_active(&*nextPlayer);
+					nextPlayer->advantage = player->advantage;
+					nextPlayer->penalty = player->penalty;
+					
 					// nextPlayer->position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 					// nextPlayer->position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 					std::cout << "Player " << nextPlayer->playerNumber << " jumped in!" << std::endl;
@@ -160,15 +166,16 @@ void Game::update(float elapsed) {
 	// input -> game state
 	// process all input effects on game state and the player (first pass for game state):
 	int correctHits = 0;
-	GameState nextState = gameState;
+	GameState nextState = matchState;
 
 	// if someone has a false start, you false starting should not end sooner
-	float shortestFalseStart = TRIGGER_MAX_TIME;
+	float shortestFalseStart = FS_PENALTY_NEUTRAL_MAX;
 	for (auto &p : players) {
 		shortestFalseStart = std::min(shortestFalseStart, p.penalty);
 	}
-	float falseStartPenalty =
-		(std::uniform_real_distribution<float>(std::max(TRIGGER_MIN_TIME, shortestFalseStart), TRIGGER_MAX_TIME))(gen);
+
+	std::uniform_real_distribution<float> fs_dis(std::max(FS_PENALTY_NEUTRAL_MIN, shortestFalseStart), FS_PENALTY_NEUTRAL_MAX);
+	float falseStartPenalty = fs_dis(rd);
 
 	for (auto &p : players) {
 		if (p.activePlayer) {
@@ -177,7 +184,7 @@ void Game::update(float elapsed) {
 			if (p.controls.down.pressed) p.inputs.emplace_back(&(p.controls.down));
 			if (p.controls.up.pressed) p.inputs.emplace_back(&(p.controls.up));
 
-			switch (gameState) {
+			switch (matchState) {
 				case GameState::NEUTRAL:
 					if (p.inputs.size() > 0 && p.penalty <= 0) p.penalty = falseStartPenalty;
 					break;
@@ -251,19 +258,19 @@ void Game::update(float elapsed) {
 			p.controls.right.downs = 0;
 			p.controls.up.downs = 0;
 			p.controls.down.downs = 0;
-			p.controls.jump.downs = 0;
 			p.controls.start.downs = 0;
 		}
 	}
 
 	// game state -> game state
 	// Actual game state updates, including player inputs affects on self
-	gameState = nextState;
-	switch (gameState) {
+	matchState = nextState;
+	switch (matchState) {
 		case GameState::STANDBY:
 			if (Player::activePlayerCount == 2) {
-				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(gen);
-				gameState = GameState::NEUTRAL; // will begin next frame
+				std::uniform_real_distribution<float> tri_dis(std::max(TRIGGER_MIN_TIME, shortestFalseStart), TRIGGER_MAX_TIME);
+				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(rd);
+				matchState = GameState::NEUTRAL; // will begin next frame
 			}
 			break;
 		case GameState::NEUTRAL:
@@ -273,7 +280,7 @@ void Game::update(float elapsed) {
 			// Start Trigger
 			if (triggerDelay <= 0) {
 				triggerDirection = (TriggerDirection)(1 << (rand() % 4)); // 0 to 3
-				gameState = GameState::TRIGGER; // will begin next frame
+				matchState = GameState::TRIGGER; // will begin next frame
 				lastPosition = progress;
 			}
 			else
@@ -288,7 +295,7 @@ void Game::update(float elapsed) {
 					}
 					p.penalty /= 4.0f;
 				}
-				gameState = GameState::ADVANTAGE;
+				matchState = GameState::ADVANTAGE;
 			}
 			else if (correctHits == 2) {
 				TriggerDirection newDir;
@@ -303,7 +310,7 @@ void Game::update(float elapsed) {
 		case GameState::ADVANTAGE:
 			if (abs(progress) > ArenaMax.x) {
 				// VICTORY!
-				gameState = GameState::END;
+				matchState = GameState::END;
 			}
 			else {
 				progress += tugDirection * TUG_SPEED;
@@ -312,7 +319,7 @@ void Game::update(float elapsed) {
 		case GameState::COUNTER:
 			// Roll progress back until it reaches lastPosition
 			if (progress == lastPosition) {
-				gameState = GameState::NEUTRAL;
+				matchState = GameState::NEUTRAL;
 				tugDirection = 0;
 
 				// advantage state
@@ -345,7 +352,9 @@ void Game::update(float elapsed) {
 	}
 }
 
-
+// Modified Game 5 starter code with my Player members
+// Sends up to date state information (particularly about the player) to a client
+// This is called by the server's game, which sends this to each client's PlayMode::game
 void Game::send_state_message(Connection *connection_, Player *connection_player) const {
 	assert(connection_);
 	auto &connection = *connection_;
@@ -357,9 +366,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	connection.send(uint8_t(0));
 	size_t mark = connection.send_buffer.size(); //keep track of this position in the buffer (mark is currently 3)
 
-
 	//send player info helper:
-	// TODO: update with new player info
 	auto send_player = [&](Player const &player) {
 		// connection.send(player.position);
 		// connection.send(player.velocity);
@@ -367,11 +374,12 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 
 		connection.send(player.playerNumber);
 		connection.send(player.activePlayer);
-		connection.send(Player::activePlayerCount);
 		connection.send(player.advantageDirection);
 
+		// TODO: need 4 bytes to send a float?
 		connection.send(player.penalty);
 		connection.send(player.advantage);
+
 
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
 		//effectively: truncates player name to 255 chars
@@ -384,11 +392,17 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 
 	//player count:
 	connection.send(uint8_t(players.size()));
-	if (connection_player) send_player(*connection_player);
+	if (connection_player) send_player(*connection_player); // this is where we see the server send the current player first
 	for (auto const &player : players) {
 		if (&player == connection_player) continue;
 		send_player(player);
 	}
+	connection.send(Player::activePlayerCount);
+
+	// TODO: Verify enum types work!
+	connection.send(progress);
+	connection.send(triggerDirection);
+	connection.send(matchState);
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
@@ -397,6 +411,8 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	connection.send_buffer[mark-1] = uint8_t(size >> 16); // 2: size (lops of leading beyond 24, and last 16)
 }
 
+// Modified Game5 starter code with new Player members
+// The client's PlayMode::game is using this to update the game state
 bool Game::recv_state_message(Connection *connection_) {
 	assert(connection_);
 	auto &connection = *connection_;
@@ -424,23 +440,34 @@ bool Game::recv_state_message(Connection *connection_) {
 	uint8_t player_count;
 	read(&player_count);
 	for (uint8_t i = 0; i < player_count; ++i) {
-		// TODO: read bytes back to construct player
+		// read bytes back to construct player
 
-		// players.emplace_back();
-		// Player &player = players.back();
-		// read(&player.position);
-		// read(&player.velocity);
-		// read(&player.color);
-		// uint8_t name_len;
-		// read(&name_len);
+		players.emplace_back();
+		Player &player = players.back();
+
+		read(&player.playerNumber);
+		read(&player.activePlayer);
+		read(&player.advantageDirection);
+
+		read(&player.penalty);
+		read(&player.advantage);
+
+		uint8_t name_len;
+		read(&name_len);
 		// //n.b. would probably be more efficient to directly copy from recv_buffer, but I think this is clearer:
-		// player.name = "";
-		// for (uint8_t n = 0; n < name_len; ++n) {
-		// 	char c;
-		// 	read(&c);
-		// 	player.name += c;
-		// }
+		player.name = "";
+		for (uint8_t n = 0; n < name_len; ++n) {
+			char c;
+			read(&c);
+			player.name += c;
+		}
+
+		read(&(Player::activePlayerCount)); // TODO: can I do this? Is this necessary??
 	}
+	// TODO: Verify enum types work!
+	read(&progress);
+	read((uint8_t*)(&triggerDirection));
+	read((uint8_t*)(&matchState));
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
 
