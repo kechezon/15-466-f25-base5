@@ -85,11 +85,9 @@ bool Game::make_player_active(Player *player) {
 	if (Player::activePlayerCount >= 2) return false;
 
 	player->activePlayer = true;
-	if (Player::activePlayerCount == 0) player->advantageDirection = -1;
-	else player->advantageDirection = 1;
-	Player::activePlayerCount++;
 	player->advantage = false;
 	player->penalty = 0.0f;
+	Player::activePlayerCount++;
 	return true;
 }
 
@@ -101,12 +99,12 @@ Player *Game::spawn_player() {
 	// player.position.x = glm::mix(ArenaMin_Clip.x + 2.0f * PlayerRadius, ArenaMax_Clip.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 	// player.position.y = glm::mix(ArenaMin_Clip.y + 2.0f * PlayerRadius, ArenaMax_Clip.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 
-	// do {
-	// 	player.color.r = mt() / float(mt.max());
-	// 	player.color.g = mt() / float(mt.max());
-	// 	player.color.b = mt() / float(mt.max());
-	// } while (player.color == glm::vec3(0.0f));
-	// player.color = glm::normalize(player.color);
+	do {
+		player.color.r = mt() / float(mt.max());
+		player.color.g = mt() / float(mt.max());
+		player.color.b = mt() / float(mt.max());
+	} while (player.color == glm::vec3(0.0f));
+	player.color = glm::normalize(player.color);
 
 	player.name = "Player " + std::to_string(next_player_number);
 	player.playerNumber = next_player_number++;
@@ -114,6 +112,15 @@ Player *Game::spawn_player() {
 	// Limit to two players (beyond that are spectators)
 	if (Player::activePlayerCount < 2) {
 		make_player_active(&player);
+		if (!(Player::leftTaken)) {
+			player.advantageDirection = -1;
+			Player::leftTaken = true;
+		}
+		else {
+			assert(Player::activePlayerCount == 2);
+			player.advantageDirection = 1;
+		}
+
 		std::cout << "Spawned Player " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
 	}
 	else {
@@ -123,7 +130,7 @@ Player *Game::spawn_player() {
 		std::cout << "Spawned Spectator " << player.playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
 	}
 
-	matchState = Player::activePlayerCount >= 2 ? GameState::NEUTRAL : GameState::NEUTRAL;
+	// matchState = Player::activePlayerCount >= 2 ? GameState::NEUTRAL : GameState::STANDBY;
 
 	return &player;
 }
@@ -137,16 +144,22 @@ void Game::remove_player(Player *player) {
 
 				auto nextPlayer = pi;
 				nextPlayer++;
-				if (nextPlayer != players.end() && !(nextPlayer->activePlayer)) {
+				std::cout << "Removed Player " << pi->playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
+				if (nextPlayer != players.end() && !(nextPlayer->activePlayer)) { // replace with earlies spectator
+					assert(Player::activePlayerCount <= 1);
 					make_player_active(&*nextPlayer);
+					assert(Player::activePlayerCount >= 1);
+
 					nextPlayer->advantage = player->advantage;
 					nextPlayer->penalty = player->penalty;
+					nextPlayer->advantageDirection = player->advantageDirection;
 					
 					// nextPlayer->position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 					// nextPlayer->position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
 					std::cout << "Player " << nextPlayer->playerNumber << " jumped in!" << std::endl;
 				}
-				std::cout << "Removed Player " << pi->playerNumber << "! Active players: " <<  Player::activePlayerCount << std::endl;
+				else if (player->advantageDirection < 0)
+					Player::leftTaken = false;
 
 			}
 			players.erase(pi);
@@ -177,12 +190,15 @@ void Game::update(float elapsed) {
 	std::uniform_real_distribution<float> fs_dis(std::max(FS_PENALTY_NEUTRAL_MIN, shortestFalseStart), FS_PENALTY_NEUTRAL_MAX);
 	float falseStartPenalty = fs_dis(rd);
 
+	std::vector<int> dirs = {0, 0};
+
 	for (auto &p : players) {
 		if (p.activePlayer) {
-			if (p.controls.left.pressed) p.inputs.emplace_back(&(p.controls.left));
-			if (p.controls.right.pressed) p.inputs.emplace_back(&(p.controls.right));
-			if (p.controls.down.pressed) p.inputs.emplace_back(&(p.controls.down));
-			if (p.controls.up.pressed) p.inputs.emplace_back(&(p.controls.up));
+			dirs[abs(dirs[0])] = p.advantageDirection;
+			if (p.controls.left.downs > 0) p.inputs.emplace_back(&(p.controls.left));
+			if (p.controls.right.downs > 0) p.inputs.emplace_back(&(p.controls.right));
+			if (p.controls.down.downs > 0) p.inputs.emplace_back(&(p.controls.down));
+			if (p.controls.up.downs > 0) p.inputs.emplace_back(&(p.controls.up));
 
 			switch (matchState) {
 				case GameState::NEUTRAL:
@@ -214,7 +230,7 @@ void Game::update(float elapsed) {
 				case GameState::ADVANTAGE:
 					if (nextState != GameState::NEUTRAL) { // if next state is neutral, the advantaged player ended their tug
 						if (p.advantage) { // if I have advantage:
-							// if pressing the same button, set nextState to NEUTRAL, and setup the triggerDelay
+							// if I tap the button again, set nextState to NEUTRAL, and setup the triggerDelay
 							if (p.inputs.size() == 1) {
 								if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] == &(p.controls.left)) ||
 									(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] == &(p.controls.right)) ||
@@ -241,12 +257,16 @@ void Game::update(float elapsed) {
 							else if (p.inputs.size() > 1)
 								p.penalty = falseStartPenalty / 4.0f;
 						}
+
+						if (nextState != GameState::ADVANTAGE) {
+							triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(rd);
+						}						
 						// 	otherwise, stay in advantage
 					}
 					break;
 				case GameState::END:
 					// restarting
-					if (p.controls.start.pressed) nextState = GameState::STANDBY;
+					if (p.controls.start.downs > 0) nextState = GameState::STANDBY;
 					break;
 				default: // COUNTER, STANDBY
 					// your inputs don't matter lol
@@ -264,29 +284,59 @@ void Game::update(float elapsed) {
 
 	// game state -> game state
 	// Actual game state updates, including player inputs affects on self
-	matchState = nextState;
+	if (Player::activePlayerCount == 2)
+		matchState = nextState;
+	else
+		matchState = GameState::STANDBY;
+
 	switch (matchState) {
 		case GameState::STANDBY:
-			if (Player::activePlayerCount == 2) {
+			printf("Standby... (%i, %i)\n", dirs[0], dirs[1]);
+			if (Player::activePlayerCount >= 2) {
+
+				// Initialize gameplay values (not progress though)
+				// advantage state
+				for (auto &p : players) {
+					if (p.activePlayer) {
+						p.advantage = false;
+					}
+				}
+				counterBonus = 0.0f;
+
 				std::uniform_real_distribution<float> tri_dis(std::max(TRIGGER_MIN_TIME, shortestFalseStart), TRIGGER_MAX_TIME);
 				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(rd);
+				if (progress - HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X > ArenaMax.x)
+					progress = 0.0f;
+
 				matchState = GameState::NEUTRAL; // will begin next frame
+				printf("STANDBY->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
 			}
 			break;
 		case GameState::NEUTRAL:
 			// trigger and false start timers, and false start triggers
 			// if trigger timer is done, set up TRIGGER state with direction
+			printf("Neutral. (%i, %i)\n", dirs[0], dirs[1]);
+
+			// advantage state
+			for (auto &p : players) {
+				if (p.activePlayer) {
+					p.advantage = false;
+				}
+			}
+			counterBonus = 0.0f;
 
 			// Start Trigger
 			if (triggerDelay <= 0) {
 				triggerDirection = (TriggerDirection)(1 << (rand() % 4)); // 0 to 3
-				matchState = GameState::TRIGGER; // will begin next frame
 				lastPosition = progress;
+				matchState = GameState::TRIGGER; // will begin next frame
+				printf("NEUTRAL->TRIGGER (%i, %i)\n", dirs[0], dirs[1]);
 			}
 			else
 				triggerDelay = std::clamp(triggerDelay - elapsed, 0.0f, triggerDelay);
 			break;
 		case GameState::TRIGGER:
+			printf("Trigger! (%i, %i)\n", dirs[0], dirs[1]);
 			// people pressed buttons
 			if (correctHits == 1) {
 				for (auto &p : players) {
@@ -296,6 +346,7 @@ void Game::update(float elapsed) {
 					p.penalty /= 4.0f;
 				}
 				matchState = GameState::ADVANTAGE;
+				printf("TRIGGER->ADVANTAGE (%i, %i)\n", dirs[0], dirs[1]);
 			}
 			else if (correctHits == 2) {
 				TriggerDirection newDir;
@@ -308,19 +359,30 @@ void Game::update(float elapsed) {
 
 			break;
 		case GameState::ADVANTAGE:
-			if (abs(progress) > ArenaMax.x) {
+			printf("Advantage!! (%i, %i)\n", dirs[0], dirs[1]);
+			if (progress - HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X > ArenaMax.x) {
 				// VICTORY!
 				matchState = GameState::END;
 			}
 			else {
-				progress += tugDirection * TUG_SPEED;
+				progress += tugDirection * TUG_SPEED * elapsed;
+				counterBonus -= tugDirection * TUG_SPEED * COUNTER_BONUS_RATE * elapsed;
+
+				assert((tugDirection < 0 && counterBonus > 0) || (tugDirection > 0 && counterBonus < 0));
 			}
 			break;
 		case GameState::COUNTER:
 			// Roll progress back until it reaches lastPosition
-			if (progress == lastPosition) {
+			printf("Counter?! (%i, %i)\n", dirs[0], dirs[1]);
+			if (progress - HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X > ArenaMax.x) {
+				// VICTORY!
+				matchState = GameState::END;
+			}
+			else if (progress == lastPosition + counterBonus) {
 				matchState = GameState::NEUTRAL;
+				printf("COUNTER->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
 				tugDirection = 0;
+				counterBonus = 0.0f;
 
 				// advantage state
 				for (auto &p : players) {
@@ -331,8 +393,14 @@ void Game::update(float elapsed) {
 			}
 			else {
 				assert(tugDirection != 0);
-				if (tugDirection < 0) progress = std::clamp(progress - (tugDirection * TUG_SPEED), progress, lastPosition + counterBonus);
-				else progress = std::clamp(progress - (tugDirection * TUG_SPEED), lastPosition - counterBonus, progress);
+				if (tugDirection < 0) {
+					assert(progress < lastPosition + counterBonus);
+					progress = std::clamp(progress - (tugDirection * TUG_SPEED * (1.0f + COUNTER_BONUS_RATE) * elapsed), progress, lastPosition + counterBonus);
+				}
+				else { assert(tugDirection > 0);
+					assert(lastPosition + counterBonus < progress);
+					progress = std::clamp(progress - (tugDirection * TUG_SPEED * (1.0f + COUNTER_BONUS_RATE) * elapsed), lastPosition + counterBonus, progress);
+				}
 			}
 			break;
 		default: // END
@@ -370,7 +438,8 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	auto send_player = [&](Player const &player) {
 		// connection.send(player.position);
 		// connection.send(player.velocity);
-		// connection.send(player.color);
+		// DEBUG
+		connection.send(player.color);
 
 		connection.send(player.playerNumber);
 		connection.send(player.activePlayer);
@@ -380,14 +449,13 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		connection.send(player.penalty);
 		connection.send(player.advantage);
 
-
 		//NOTE: can't just 'send(name)' because player.name is not plain-old-data type.
 		//effectively: truncates player name to 255 chars
 		uint8_t len = uint8_t(std::min< size_t >(255, player.name.size()));
 		connection.send(len);
 		connection.send_buffer.insert(connection.send_buffer.end(), player.name.begin(), player.name.begin() + len);
 
-		// TODO: figure out if I need to send inputs and how
+		// no need to send player inputs, those get refreshed at the beginning of the game state update
 	};
 
 	//player count:
@@ -399,13 +467,13 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	}
 	connection.send(Player::activePlayerCount);
 
-	// TODO: Verify enum types work!
 	connection.send(progress);
 	connection.send(triggerDirection);
 	connection.send(matchState);
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
+
 	connection.send_buffer[mark-3] = uint8_t(size); // 0: size (lops off leading beyond 8)
 	connection.send_buffer[mark-2] = uint8_t(size >> 8); // 1: size (lops off leading 16, and last 8)
 	connection.send_buffer[mark-1] = uint8_t(size >> 16); // 2: size (lops of leading beyond 24, and last 16)
@@ -445,6 +513,9 @@ bool Game::recv_state_message(Connection *connection_) {
 		players.emplace_back();
 		Player &player = players.back();
 
+		// DEBUG
+		read(&player.color);
+
 		read(&player.playerNumber);
 		read(&player.activePlayer);
 		read(&player.advantageDirection);
@@ -462,12 +533,12 @@ bool Game::recv_state_message(Connection *connection_) {
 			player.name += c;
 		}
 
-		read(&(Player::activePlayerCount)); // TODO: can I do this? Is this necessary??
 	}
-	// TODO: Verify enum types work!
+	read(&(Player::activePlayerCount)); // TODO: can I do this? Is this necessary??
+
 	read(&progress);
-	read((uint8_t*)(&triggerDirection));
-	read((uint8_t*)(&matchState));
+	read((&triggerDirection));
+	read((&matchState));
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
 

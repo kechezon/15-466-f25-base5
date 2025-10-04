@@ -29,8 +29,8 @@ struct PlayMode : Mode {
 
 	// Local copy of scene and camera, so I can change it during gameplay
 	// Based on Starter code from Game 2 onwards
-	Scene scene;
-	Scene::Camera *camera = nullptr;
+	// Scene scene;
+	// Scene::Camera *camera = nullptr;
 
 	//last message from server:
 	std::string server_message;
@@ -53,6 +53,8 @@ struct PlayMode : Mode {
 	Scene::Transform *adv_box_p1 = nullptr; // left player
 	Scene::Transform *adv_box_p2 = nullptr; // right player
 	Scene::Transform *counter_box = nullptr; // default
+	Scene::Transform *penalty_x1 = nullptr; // default
+	Scene::Transform *penalty_x2 = nullptr; // default
 
 	const float HAND_OFFSET_X = 0.4f; // from rope center
 	const float LIGHT_OFFSET_X = 0.625f; // from rope center

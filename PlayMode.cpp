@@ -19,35 +19,36 @@
 /**************************************************************
  * Scene loading code based on starter code from Game2 onwards
  **************************************************************/
-GLuint quicktug_meshes_for_lit_color_texture_program = 0;
-Load< MeshBuffer > quicktug_meshes(LoadTagDefault, []() -> MeshBuffer const * {
-	MeshBuffer const *ret = new MeshBuffer(data_path("quicktug.pnct"));
-	quicktug_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
-	return ret;
-});
+// GLuint quicktug_meshes_for_lit_color_texture_program = 0;
+// Load< MeshBuffer > quicktug_meshes(LoadTagDefault, []() -> MeshBuffer const * {
+// 	MeshBuffer const *ret = new MeshBuffer(data_path("quicktug.pnct"));
+// 	quicktug_meshes_for_lit_color_texture_program = ret->make_vao_for_program(lit_color_texture_program->program);
+// 	return ret;
+// });
 
-Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
-	return new Scene(data_path("quicktug.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
-		Mesh const &mesh = quicktug_meshes->lookup(mesh_name);
+// Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
+// 	return new Scene(data_path("quicktug.scene"), [&](Scene &scene, Scene::Transform *transform, std::string const &mesh_name){
+// 		Mesh const &mesh = quicktug_meshes->lookup(mesh_name);
 
-		scene.drawables.emplace_back(transform);
-		Scene::Drawable &drawable = scene.drawables.back();
+// 		scene.drawables.emplace_back(transform);
+// 		Scene::Drawable &drawable = scene.drawables.back();
 
-		drawable.pipeline = lit_color_texture_program_pipeline;
+// 		drawable.pipeline = lit_color_texture_program_pipeline;
 
-		drawable.pipeline.vao = quicktug_meshes_for_lit_color_texture_program;
-		drawable.pipeline.type = mesh.type;
-		drawable.pipeline.start = mesh.start;
-		drawable.pipeline.count = mesh.count;
+// 		drawable.pipeline.vao = quicktug_meshes_for_lit_color_texture_program;
+// 		drawable.pipeline.type = mesh.type;
+// 		drawable.pipeline.start = mesh.start;
+// 		drawable.pipeline.count = mesh.count;
 
-	});
-});
+// 	});
+// });
 
 /***********************************
  * Scene copying code based on
  * starter code from Game 2 onwards 
  ***********************************/
-PlayMode::PlayMode(Client &client_) : scene(*quicktug_scene), client(client_) {
+PlayMode::PlayMode(Client &client_) : client(client_){ //, scene(*quicktug_scene) {
+	/* DEBUG
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Rope.FL") rope = &transform;
 		else if (transform.name == "P1.FL") p1_hands = &transform;
@@ -61,6 +62,8 @@ PlayMode::PlayMode(Client &client_) : scene(*quicktug_scene), client(client_) {
 		else if (transform.name == "AdvantageBoxP1.FL") adv_box_p1 = &transform;
 		else if (transform.name == "AdvantageBoxP2.FL") adv_box_p2 = &transform;
 		else if (transform.name == "CounterBox.FL") counter_box = &transform;
+		else if (transform.name == "Penalty1.FL") penalty_x1 = &transform;
+		else if (transform.name == "Penalty2.FL") penalty_x2 = &transform;
 	}
 
 	if (rope == nullptr) throw std::runtime_error("Rope not found.");
@@ -75,10 +78,13 @@ PlayMode::PlayMode(Client &client_) : scene(*quicktug_scene), client(client_) {
 	if (adv_box_p1 == nullptr) throw std::runtime_error("P1 Advantage Box not found.");
 	if (adv_box_p2 == nullptr) throw std::runtime_error("P2 Advantage Box not found.");
 	if (counter_box == nullptr) throw std::runtime_error("Counter Box not found.");
+	if (penalty_x1 == nullptr) throw std::runtime_error("Penalty 1 not found.");
+	if (penalty_x2 == nullptr) throw std::runtime_error("Penalty 2 not found.");
 
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
 	camera = &scene.cameras.front();
+	*/
 }
 
 PlayMode::~PlayMode() {
@@ -105,7 +111,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 			controls.down.downs += 1;
 			controls.down.pressed = true;
 			return true;
-		} else if (evt.key.key == SDLK_ENTER || evt.key.key == SDLK_SPACE) {
+		} else if (evt.key.key == SDLK_RETURN || evt.key.key == SDLK_SPACE) {
 			controls.start.downs += 1;
 			controls.start.pressed = true;
 		}
@@ -122,7 +128,7 @@ bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size)
 		} else if (evt.key.key == SDLK_S) {
 			controls.down.pressed = false;
 			return true;
-		} else if (evt.key.key == SDLK_ENTER || evt.key.key == SDLK_SPACE) {
+		} else if (evt.key.key == SDLK_RETURN || evt.key.key == SDLK_SPACE) {
 			controls.start.pressed = false;
 			return true;
 		}
@@ -170,6 +176,8 @@ void PlayMode::update(float elapsed) {
 }
 
 void PlayMode::draw(glm::uvec2 const &drawable_size) {
+	//update camera aspect ratio for drawable (from base code of Game 2 onwards):
+	// camera->aspect = float(drawable_size.x) / float(drawable_size.y);
 
 	static std::array< glm::vec2, 16 > const circle = [](){
 		std::array< glm::vec2, 16 > ret;
@@ -180,7 +188,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		return ret;
 	}();
 
-	glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+	glClearColor(0.1f, 0.5f, 0.5f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glDisable(GL_DEPTH_TEST);
 	
@@ -199,21 +207,12 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		0.0f, 0.0f, 0.0f, 1.0f
 	);
 
+	/*
 	{
 		DrawLines lines(world_to_clip);
 
 		// Set rope, hand positions, and off-lights
 		rope->position = glm::vec3(game.progress, 0.0f, ROPE_HEIGHT);
-
-		if (Player::activePlayerCount >= 1) {
-			p1_hands->position = glm::vec3(game.progress - HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
-			p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-
-			if (Player::activePlayerCount == 2) {
-				p2_hands->position = glm::vec3(game.progress + HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
-				p2_hands->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-			}
-		}
 
 		// Set offscreen box and light positions
 		empty_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
@@ -223,8 +222,31 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		counter_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
 		p1_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
 		p2_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		penalty_x1->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
+		penalty_x2->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
 
-		// TODO: Set trigger box and other models based on game state
+		if (Player::activePlayerCount >= 1) {
+			p1_hands->position = glm::vec3(game.progress - game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
+			p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+
+			if (Player::activePlayerCount == 2) {
+				p2_hands->position = glm::vec3(game.progress + game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				p2_hands->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+
+				for (auto const &player : game.players) {
+					if (player.activePlayer) {
+						if (player.advantageDirection < 0 && player.penalty > 0.0f) {
+							penalty_x1 = p1_hands->position + glm::vec3(0.0f, -0.5f, 0.0f);
+						}
+						else { assert(player.advantageDirection > 0);
+							penalty_x2 = p2_hands->position + glm::vec3(0.0f, -0.5f, 0.0f);
+						}
+					}
+				}
+			}
+		}
+
+		// Set trigger box and other models based on game state
 		float box_angle = 0.0f;
 		Scene::Transform *adv_box = nullptr;
 		Scene::Transform *adv_light = nullptr;
@@ -286,6 +308,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
 			case Game::GameState::END:
+				// TODO: Victory message
 				break;
 		}
 
@@ -307,10 +330,188 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff))
+		
+	}
+	*/
+
+	{
+		DrawLines lines(world_to_clip);
+
+		auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
+			lines.draw_text(text,
+				glm::vec3(at.x, at.y, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+			float ofs = (1.0f / scale) / drawable_size.y;
+			lines.draw_text(text,
+				glm::vec3(at.x + ofs, at.y + ofs, 0.0),
+				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		};
+
+		for (auto const &player : game.players) {
+			if (player.activePlayer) {
+				glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
+				if (&player == &game.players.front()) {
+					//mark current player (which server sends first):
+					// lines.draw(
+					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2(-0.5f,-0.5f), 0.0f),
+					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2( 0.5f, 0.5f), 0.0f),
+					// 	col
+					// );
+					// lines.draw(
+					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2(-0.5f, 0.5f), 0.0f),
+					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2( 0.5f,-0.5f), 0.0f),
+					// 	col
+					// );
+					draw_text(glm::vec2(game.progress + (player.advantageDirection * (game.HAND_OFFSET_X + Game::PlayerRadius)), ROPE_HEIGHT -0.1f - Game::PlayerRadius), "YOU!", 0.09f);
+				}
+				glm::vec2 pos = glm::vec2(game.progress + (player.advantageDirection * game.HAND_OFFSET_X), ROPE_HEIGHT);
+				for (uint32_t a = 0; a < circle.size(); ++a) {
+					lines.draw(
+						glm::vec3(pos + Game::PlayerRadius * circle[a], 0.0f),
+						glm::vec3(pos + Game::PlayerRadius * circle[(a+1)%circle.size()], 0.0f),
+						col
+					);
+				}
+
+				// TODO: False start
+
+				// draw_text(glm::vec2(0.0f, -0.1f + Game::PlayerRadius), player.name, 0.09f);
+			}
+		}
+
+		// if (Player::activePlayerCount >= 1) {
+			// p1_hands->position = glm::vec3(game.progress - game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
+			// p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+
+			// if (Player::activePlayerCount == 2) {
+			// 	p2_hands->position = glm::vec3(game.progress + game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
+			// 	p2_hands->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+			// }
+		// }
+
+		switch (game.matchState) {
+			case Game::GameState::STANDBY:
+				// empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				break;
+			case Game::GameState::NEUTRAL:
+				// assert(Player::activePlayerCount == 2);
+				draw_text(glm::vec2(0.0f, box_height), "Wait for it...", 0.09f);
+				break;
+			case Game::GameState::TRIGGER:
+				if (game.triggerDirection == Game::TriggerDirection::LEFT)
+					draw_text(glm::vec2(0.0f, box_height), "LEFT!", 0.09f);
+				else if (game.triggerDirection == Game::TriggerDirection::RIGHT)
+					draw_text(glm::vec2(0.0f, box_height), "RIGHT!", 0.09f);
+				else if (game.triggerDirection == Game::TriggerDirection::DOWN)
+					draw_text(glm::vec2(0.0f, box_height), "DOWN!", 0.09f);
+				else { assert(game.triggerDirection == Game::TriggerDirection::UP);
+					draw_text(glm::vec2(0.0f, box_height), "UP!", 0.09f);
+				}
+
+				// trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				// trigger_box->rotation = glm::quat(1.0f, 0.0f, box_angle, 0.0f);
+				break;
+			case Game::GameState::ADVANTAGE:
+				// Trigger Box and Light need to be brought into the fold
+
+				if (game.triggerDirection == Game::TriggerDirection::LEFT)
+					draw_text(glm::vec2(0.0f, box_height), "It's going Left!", 0.09f);
+				else if (game.triggerDirection == Game::TriggerDirection::RIGHT)
+					draw_text(glm::vec2(0.0f, box_height), "It's going Right!", 0.09f);
+				else if (game.triggerDirection == Game::TriggerDirection::DOWN)
+					draw_text(glm::vec2(0.0f, box_height), "It's going Down!", 0.09f);
+				else { assert(game.triggerDirection == Game::TriggerDirection::UP);
+					draw_text(glm::vec2(0.0f, box_height), "It's going Up!", 0.09f);
+				}
+
+				break;
+			case Game::GameState::COUNTER:
+				draw_text(glm::vec2(0.0f, box_height), "COUNTER!!", 0.09f);
+				// trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
+				// p1_light_on->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				// p1_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				// p2_light_on->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+				// p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				break;
+			case Game::GameState::END:
+				if (game.progress < 0) {
+					for (auto const &player : game.players) {
+						if (&player == &game.players.front()) {
+
+							// find winner
+							std::string winner;
+							for (auto const &p : game.players) {
+								if (p.activePlayer && p.advantageDirection < 0) {
+									if (!(player.activePlayer) || p.name == player.name) {
+										winner = p.name + " wins!";
+										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again!", 0.09f);
+									}
+									else {
+										winner = p.name + " wins...";
+										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again", 0.09f);
+									}
+									break;
+								}
+							}
+							draw_text(glm::vec2(0.0f, box_height), winner, 0.09f);
+							break;
+						}
+					}
+				}
+				else { assert(game.progress > 0);
+					for (auto const &player : game.players) {
+						if (&player == &game.players.front()) {
+							// find winner
+							std::string winner;
+							for (auto const &p : game.players) {
+								if (p.activePlayer && p.advantageDirection > 0) {
+									if (!(player.activePlayer) || p.name == player.name) {
+										winner = p.name + " wins!";
+										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again!", 0.09f);
+									}
+									else {
+										winner = p.name + " wins...";
+										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again", 0.09f);
+									}
+									break;
+								}
+							}
+							draw_text(glm::vec2(0.0f, box_height), winner, 0.09f);
+							break;
+						}
+					}
+				}
+				break;
+			default:
+				break;
+		}
+
+		// DEBUG:
+
+		//helper:
+		// auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
+		// 	lines.draw_text(text,
+		// 		glm::vec3(at.x, at.y, 0.0),
+		// 		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+		// 		glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		// 	float ofs = (1.0f / scale) / drawable_size.y;
+		// 	lines.draw_text(text,
+		// 		glm::vec3(at.x + ofs, at.y + ofs, 0.0),
+		// 		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+		// 		glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		// };
+
+		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		
+	}
 
-
-
+	{
 		/*for (auto const &player : game.players) {
 			glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
 			if (&player == &game.players.front()) {

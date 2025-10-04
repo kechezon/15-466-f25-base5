@@ -49,6 +49,7 @@ struct Player {
 	inline static int activePlayerCount = 0;
 	int advantageDirection = 0;
 	std::string name = "";
+	inline static bool leftTaken = false;
 
 	// dynamic gameplay information
 	float penalty = 0.0f; // false starts add to penalty
@@ -98,7 +99,9 @@ struct Game {
 
 	//progress variables and visuals
 	float progress = 0.0f; // need to reach one of the arena bounds
+	const float HAND_OFFSET_X = 0.4f; // from rope center
 	float lastPosition = 0.0f; // during COUNTER, revert back to this
+	const float COUNTER_BONUS_RATE = 0.2f; // plus 50% of progress made
 	float counterBonus = 0.0f; // plus 50% of progress made
 	const float TUG_SPEED = 0.5f; // units per second
 	int tugDirection = 0;
@@ -108,7 +111,9 @@ struct Game {
 
 	//QTE triggers:
 	const float TRIGGER_MIN_TIME = 3.0f;
-	const float TRIGGER_MAX_TIME = 10.0f;
+	// const float TRIGGER_MAX_TIME = 10.0f;
+	// DEBUG:
+	const float TRIGGER_MAX_TIME = 4.0f;
 	float triggerDelay = 10.0f; // how to use:
 								// std::random_device rd;
 								// std::mt19937 gen(rd());
