@@ -34,7 +34,8 @@ Strategy:
 - Not all is lost if your opponent has a better reaction time! If you're aware that your opponent reacts faster than you, then you can mentally prepare yourself to Counter before they do, essentially skipping those early steps.
 - Of course, if you suspect that your opponent has a trigger finger, you can bait them into a False Start, netting you a ton of progress!
 - When you Counter, you not only undo your opponents progress, but even gain a percentage of the progress they made, so sometimes it might be worth it to delay your Counter.
-- Be aware of the Tug Clock. It should really only matter if you're turtling (ending your pulls very quickly), but it can set you back if you aren't careful!
+
+- WANTED TO ADD: Be aware of the Tug Clock. It should really only matter if you're turtling (ending your pulls very quickly), but it can set you back if you aren't careful!
 
 Sources:
 - Font used: [Google Font Hammersmith One](https://fonts.google.com/specimen/Hammersmith+One?preview.text=Select%20a%20cone%20type!&query=nic)

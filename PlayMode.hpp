@@ -70,6 +70,7 @@ struct PlayMode : Mode {
 	// Text
 	TextMeshNovice identifier_text;
 	TextMeshNovice victory_text;
+	TextMeshNovice play_again_text;
 
 	// TODO: winner bouncing hand
 	// const float WINNER_BOUNCE_START_OFFSET_Y = 0.5f;

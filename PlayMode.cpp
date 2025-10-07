@@ -50,7 +50,7 @@ Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
  * Scene copying code based on
  * starter code from Game 2 onwards 
  ***********************************/
-PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"), victory_text("WINS!"), scene(*quicktug_scene), client(client_) { //, scene(*quicktug_scene) {
+PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"), victory_text("WINS!"), play_again_text("Press ENTER or SPACE to play again!"), scene(*quicktug_scene), client(client_) { //, scene(*quicktug_scene) {
 	/* DEBUG */
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Rope") rope = &transform;
@@ -95,6 +95,9 @@ PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"), victory_text("WIN
 	// identifier_text = TextMeshNovice::TextMeshNovice("YOU!");
 	identifier_text.create_data_vector();
 	identifier_text.create_mesh(Mode::window, 0.0f, 0.0f, 0.2f, 0x00, 0x00, 0x00, 0xff);
+
+	play_again_text.create_data_vector();
+	play_again_text.create_mesh(Mode::window, 0.0f, 0.0f, 0.1f, 0x00, 0x00, 0x00, 0xff);
 }
 
 PlayMode::~PlayMode() {
@@ -393,7 +396,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		}
 
 		if (game.matchState == Game::GameState::END) {
-			if (!victory_text.data_created) victory_text.create_data_vector();
+			// if (!victory_text.data_created) victory_text.create_data_vector();
 
 			auto determine_leading_player = [&]() {
 				if (game.progress < 0) {
@@ -414,22 +417,28 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			};
 			
 			if (!victory_text.data_created) {
-				printf("setting\n");
-				glm::vec3 victory_text_clip = glm::vec3(world_to_clip * glm::vec4(0.0f, 0.4f, 0.0f, 1.0f));
+				// printf("setting\n");
+				glm::vec3 victory_text_clip = glm::vec3(world_to_clip * glm::vec4(0.0f, BOX_HEIGHT + 0.75f, 0.0f, 1.0f));
 
 				Player *winner = determine_leading_player();
 				assert(winner != nullptr);
-				victory_text.set_text((winner->name + std::string(" wins!!")).c_str());
+
+				std::string temp = winner->name + std::string(" wins!!");
+				char victory_msg[1024];
+				strcpy_s(victory_msg, temp.length() + 1, temp.c_str());
+
+				printf("%s\n", victory_msg);
+				victory_text.set_text(victory_msg);
 				victory_text.create_data_vector();
 				if (winner->advantageDirection < 0) {
-					victory_text.set_position(Mode::window, victory_text_clip.x, victory_text_clip.y, 0.2f,
-																						0x00, 0x00, 0xff, 0xff);
+					victory_text.create_mesh(Mode::window, 0.0f, victory_text_clip.y, 0.2f, 0x00, 0x00, 0xff, 0xff);
 				} else { assert(winner->advantageDirection > 0);
-					victory_text.set_position(Mode::window, victory_text_clip.x, victory_text_clip.y, 0.2f,
-																						0xff, 0x00, 0x00, 0xff);
+					victory_text.create_mesh(Mode::window, 0.0f, victory_text_clip.y, 0.2f, 0xff, 0x00, 0x00, 0xff);
 				}
 			}
+			play_again_text.set_position(Mode::window, 0.0f, 0.1f, 0.1f, 0x00, 0x00, 0x00, 0xff);
 			victory_text.draw_text_mesh();
+			play_again_text.draw_text_mesh();
 		}
 
 		// DEBUG:

@@ -109,6 +109,7 @@ struct TextMeshNovice { // single line text
     // NOTE: You'll need to call create_data_vector and set_position after calling this function
     void set_text(const char *mytext_) {
         mytext = mytext_;
+        data.clear();
     }
 
     void create_data_vector() {
@@ -133,10 +134,9 @@ struct TextMeshNovice { // single line text
          * /end Harfbuzz Tutorial
          *************************/
 
-        data.clear();
-
         /***************************
-         * Based on Jim McCann Code
+         * Based on Jim McCann's provided
+         * XOR/Circle Example
          ***************************/
         //texture size:
         data_width = 0;
