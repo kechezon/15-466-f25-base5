@@ -29,8 +29,8 @@ struct PlayMode : Mode {
 
 	// Local copy of scene and camera, so I can change it during gameplay
 	// Based on Starter code from Game 2 onwards
-	// Scene scene;
-	// Scene::Camera *camera = nullptr;
+	Scene scene;
+	Scene::Camera *camera = nullptr;
 
 	//last message from server:
 	std::string server_message;
@@ -47,6 +47,8 @@ struct PlayMode : Mode {
 	Scene::Transform *p1_light_on = nullptr;
 	Scene::Transform *p2_light_off = nullptr;
 	Scene::Transform *p2_light_on = nullptr;
+	Scene::Transform *p1_flag = nullptr;
+	Scene::Transform *p2_flag = nullptr;
 
 	Scene::Transform *empty_box = nullptr;
 	Scene::Transform *trigger_box = nullptr; // default
@@ -56,10 +58,13 @@ struct PlayMode : Mode {
 	Scene::Transform *penalty_x1 = nullptr; // default
 	Scene::Transform *penalty_x2 = nullptr; // default
 
-	const float HAND_OFFSET_X = 0.4f; // from rope center
-	const float LIGHT_OFFSET_X = 0.625f; // from rope center
-	const float ROPE_HEIGHT = -0.5f;
-	const float box_height = 0.5f;
+	const float HAND_OFFSET_X = 1.5f; // from rope center
+	const float LIGHT_OFFSET_X = 2.25f; // from rope center
+	const float LIGHT_OFFSET_Y = 0.0f; // from rope center
+	const float ROPE_HEIGHT = -1.0f;
+	const float ROPE_OFFSET_Y = 0.15f;
+	const float PENALTY_OFFSET_Y = -0.4f;
+	const float BOX_HEIGHT = 2.0f;
 
 	// TODO: winner bouncing hand
 	// const float WINNER_BOUNCE_START_OFFSET_Y = 0.5f;

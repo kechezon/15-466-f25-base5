@@ -79,8 +79,8 @@ struct Game {
 	//arena size:
 	inline static constexpr glm::vec2 ArenaMin_Clip = glm::vec2(-1.5f, -1.0f);
 	inline static constexpr glm::vec2 ArenaMax_Clip = glm::vec2( 1.5f,  1.0f);
-	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-1.5f, -1.0f);
-	inline static constexpr glm::vec2 ArenaMax = glm::vec2( 1.5f,  1.0f);
+	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-6.3f,-4.0f);
+	inline static constexpr glm::vec2 ArenaMax = glm::vec2( 6.3f, 4.0f);
 
 	//player constants:
 	inline static constexpr float PlayerRadius = 0.06f;
@@ -99,11 +99,12 @@ struct Game {
 
 	//progress variables and visuals
 	float progress = 0.0f; // need to reach one of the arena bounds
-	const float HAND_OFFSET_X = 0.4f; // from rope center
+	const float HAND_OFFSET_X = 1.5f; // from rope center
+	const float EXTRA_HAND_OFFSET_X = 1.0f; // from rope center
 	float lastPosition = 0.0f; // during COUNTER, revert back to this
 	const float COUNTER_BONUS_RATE = 0.2f; // plus 50% of progress made
 	float counterBonus = 0.0f; // plus 50% of progress made
-	const float TUG_SPEED = 0.5f; // units per second
+	const float TUG_SPEED = 1.0f; // units per second
 	int tugDirection = 0;
 
 	// randomizer needs (from cpp documentation)

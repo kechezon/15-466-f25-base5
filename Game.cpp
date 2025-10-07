@@ -291,7 +291,7 @@ void Game::update(float elapsed) {
 
 	switch (matchState) {
 		case GameState::STANDBY:
-			printf("Standby... (%i, %i)\n", dirs[0], dirs[1]);
+			// printf("Standby... (%i, %i)\n", dirs[0], dirs[1]);
 			if (Player::activePlayerCount >= 2) {
 
 				// Initialize gameplay values (not progress though)
@@ -305,17 +305,17 @@ void Game::update(float elapsed) {
 
 				std::uniform_real_distribution<float> tri_dis(std::max(TRIGGER_MIN_TIME, shortestFalseStart), TRIGGER_MAX_TIME);
 				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(rd);
-				if (progress - HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X > ArenaMax.x)
+				if (progress - HAND_OFFSET_X - EXTRA_HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X + EXTRA_HAND_OFFSET_X > ArenaMax.x)
 					progress = 0.0f;
 
 				matchState = GameState::NEUTRAL; // will begin next frame
-				printf("STANDBY->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
+				// printf("STANDBY->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
 			}
 			break;
 		case GameState::NEUTRAL:
 			// trigger and false start timers, and false start triggers
 			// if trigger timer is done, set up TRIGGER state with direction
-			printf("Neutral. (%i, %i)\n", dirs[0], dirs[1]);
+			// printf("Neutral. (%i, %i)\n", dirs[0], dirs[1]);
 
 			// advantage state
 			for (auto &p : players) {
@@ -330,13 +330,13 @@ void Game::update(float elapsed) {
 				triggerDirection = (TriggerDirection)(1 << (rand() % 4)); // 0 to 3
 				lastPosition = progress;
 				matchState = GameState::TRIGGER; // will begin next frame
-				printf("NEUTRAL->TRIGGER (%i, %i)\n", dirs[0], dirs[1]);
+				// printf("NEUTRAL->TRIGGER (%i, %i)\n", dirs[0], dirs[1]);
 			}
 			else
 				triggerDelay = std::clamp(triggerDelay - elapsed, 0.0f, triggerDelay);
 			break;
 		case GameState::TRIGGER:
-			printf("Trigger! (%i, %i)\n", dirs[0], dirs[1]);
+			// printf("Trigger! (%i, %i)\n", dirs[0], dirs[1]);
 			// people pressed buttons
 			if (correctHits == 1) {
 				for (auto &p : players) {
@@ -346,7 +346,7 @@ void Game::update(float elapsed) {
 					p.penalty /= 4.0f;
 				}
 				matchState = GameState::ADVANTAGE;
-				printf("TRIGGER->ADVANTAGE (%i, %i)\n", dirs[0], dirs[1]);
+				// printf("TRIGGER->ADVANTAGE (%i, %i)\n", dirs[0], dirs[1]);
 			}
 			else if (correctHits == 2) {
 				TriggerDirection newDir;
@@ -359,8 +359,8 @@ void Game::update(float elapsed) {
 
 			break;
 		case GameState::ADVANTAGE:
-			printf("Advantage!! (%i, %i)\n", dirs[0], dirs[1]);
-			if (progress - HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X > ArenaMax.x) {
+			// printf("Advantage!! (%i, %i)\n", dirs[0], dirs[1]);
+			if (progress - HAND_OFFSET_X - EXTRA_HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X + EXTRA_HAND_OFFSET_X > ArenaMax.x) {
 				// VICTORY!
 				matchState = GameState::END;
 			}
@@ -373,14 +373,14 @@ void Game::update(float elapsed) {
 			break;
 		case GameState::COUNTER:
 			// Roll progress back until it reaches lastPosition
-			printf("Counter?! (%i, %i)\n", dirs[0], dirs[1]);
-			if (progress - HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X > ArenaMax.x) {
+			// printf("Counter?! (%i, %i)\n", dirs[0], dirs[1]);
+			if (progress - HAND_OFFSET_X - EXTRA_HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X + EXTRA_HAND_OFFSET_X > ArenaMax.x) {
 				// VICTORY!
 				matchState = GameState::END;
 			}
 			else if (progress == lastPosition + counterBonus) {
 				matchState = GameState::NEUTRAL;
-				printf("COUNTER->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
+				// printf("COUNTER->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
 				tugDirection = 0;
 				counterBonus = 0.0f;
 
