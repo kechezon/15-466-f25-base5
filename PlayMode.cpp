@@ -50,7 +50,11 @@ Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
  * Scene copying code based on
  * starter code from Game 2 onwards 
  ***********************************/
-PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"), victory_text("WINS!"), play_again_text("Press ENTER or SPACE to play again!"), scene(*quicktug_scene), client(client_) { //, scene(*quicktug_scene) {
+PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"),
+									  victory_text("WINS!"),
+									  play_again_text("Press ENTER or SPACE to play again!"),
+									  tug_clock_text("0"),
+									  scene(*quicktug_scene), client(client_) {
 	/* DEBUG */
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Rope") rope = &transform;
@@ -98,6 +102,8 @@ PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"), victory_text("WIN
 
 	play_again_text.create_data_vector();
 	play_again_text.create_mesh(Mode::window, 0.0f, 0.0f, 0.1f, 0x00, 0x00, 0x00, 0xff);
+
+	lastTugClockTime = 0;
 }
 
 PlayMode::~PlayMode() {
@@ -299,6 +305,13 @@ void PlayMode::update(float elapsed) {
 				p2_light_on->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, LIGHT_OFFSET_Y);
 				p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
+			case Game::GameState::TC_VIOLATION:
+				counter_box->position = glm::vec3(0.0f, 0.0f, BOX_HEIGHT);
+				p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, LIGHT_OFFSET_Y);
+				p1_light_on->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				p2_light_off->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, LIGHT_OFFSET_Y);
+				p2_light_on->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				break;
 			case Game::GameState::END:
 				// TODO: Victory message, hide lights
 				empty_box->position = glm::vec3(0.0f, 0.0f, BOX_HEIGHT);
@@ -308,6 +321,8 @@ void PlayMode::update(float elapsed) {
 				p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
 		}
+
+		if (game.matchState != Game::GameState::TC_VIOLATION) tcViolationOccurring = false;
 	}
 }
 
@@ -359,19 +374,19 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	);
 	
 	{
-		DrawLines lines(world_to_clip);
+		// DrawLines lines(world_to_clip);
 
-		auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
-			lines.draw_text(text,
-				glm::vec3(at.x, at.y, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-			float ofs = (1.0f / scale) / drawable_size.y;
-			lines.draw_text(text,
-				glm::vec3(at.x + ofs, at.y + ofs, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-		};
+		// auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
+		// 	lines.draw_text(text,
+		// 		glm::vec3(at.x, at.y, 0.0),
+		// 		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+		// 		glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		// 	float ofs = (1.0f / scale) / drawable_size.y;
+		// 	lines.draw_text(text,
+		// 		glm::vec3(at.x + ofs, at.y + ofs, 0.0),
+		// 		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+		// 		glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		// };
 
 		for (auto const &player : game.players) {
 			if (player.activePlayer) {
@@ -396,8 +411,6 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		}
 
 		if (game.matchState == Game::GameState::END) {
-			// if (!victory_text.data_created) victory_text.create_data_vector();
-
 			auto determine_leading_player = [&]() {
 				if (game.progress < 0) {
 					for (auto &p : game.players) {
@@ -439,6 +452,30 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 			play_again_text.set_position(Mode::window, 0.0f, 0.1f, 0.1f, 0x00, 0x00, 0x00, 0xff);
 			victory_text.draw_text_mesh();
 			play_again_text.draw_text_mesh();
+		}
+		else if (game.matchState != Game::GameState::STANDBY) {
+			glm::vec3 tug_clock_clip = glm::vec3(world_to_clip * glm::vec4(0.0f, BOX_HEIGHT - 1.5f, 0.0f, 1.0f));
+			
+			if (game.matchState == Game::GameState::TC_VIOLATION && !tcViolationOccurring) {
+				tug_clock_text.set_text("Tug Clock Violation!");
+				tug_clock_text.create_data_vector();
+				tug_clock_text.create_mesh(Mode::window, 0.0f, tug_clock_clip.y, 0.1f, 0xff, 0x00, 0xff, 0xff);
+				tcViolationOccurring = true;
+				lastTugClockTime = -1;
+			}
+			else {
+				if (!tcViolationOccurring && lastTugClockTime != game.tugClockTimer) {
+					std::string timerToString = std::to_string(game.tugClockTimer);
+					char timerCharArr[1024];
+					strcpy_s(timerCharArr, timerToString.length() + 1, timerToString.c_str());
+
+					tug_clock_text.set_text(timerCharArr);
+					tug_clock_text.create_data_vector();
+					tug_clock_text.create_mesh(Mode::window, 0.0f, tug_clock_clip.y, 0.1f, 0xff, 0x00, 0xff, 0xff);
+					lastTugClockTime = game.tugClockTimer;
+				}
+			}
+			tug_clock_text.draw_text_mesh();
 		}
 
 		// DEBUG:

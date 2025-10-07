@@ -90,9 +90,6 @@ struct TextMeshNovice { // single line text
             printf("Failed to make new face for text %s from file %s... (%i)\n", mytext, fontfile, ft_error);
             abort();
         }
-        else {
-            printf("Got file %s... sometimes...\n", fontfile);
-        }
 
         // face->size lets you get pixel size. This size object models all information needed w.r.t. character sizes
         // Use FT_Set_Char_Size, passing a handle to the face object you have.

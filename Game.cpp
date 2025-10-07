@@ -228,15 +228,22 @@ void Game::update(float elapsed) {
 					}
 					break;
 				case GameState::ADVANTAGE:
-					if (nextState != GameState::NEUTRAL) { // if next state is neutral, the advantaged player ended their tug
+					if (nextState != GameState::NEUTRAL && nextState != GameState::TC_VIOLATION) {
+						 // if next state is neutral or tc_violation, the advantaged player ended their tug
 						if (p.advantage) { // if I have advantage:
-							// if I tap the button again, set nextState to NEUTRAL, and setup the triggerDelay
+							// if I tap the button again, set nextState to NEUTRAL, and setup tug clock
 							if (p.inputs.size() == 1) {
 								if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] == &(p.controls.left)) ||
 									(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] == &(p.controls.right)) ||
 									(triggerDirection == TriggerDirection::UP && p.inputs[0] == &(p.controls.up)) ||
-									(triggerDirection == TriggerDirection::DOWN && p.inputs[0] == &(p.controls.down)))	
-										nextState = GameState::NEUTRAL;
+									(triggerDirection == TriggerDirection::DOWN && p.inputs[0] == &(p.controls.down))) {
+										if (tugClockTimer <= 0 && tugClockBoundaryProgress < TUG_CLOCK_BOUNDARY) {
+											nextState = GameState::TC_VIOLATION;
+										}
+										else {
+											nextState = GameState::NEUTRAL;
+										}
+									}
 							}
 						}
 						else { assert(!(p.advantage)); // if I'm the counterer
@@ -245,8 +252,12 @@ void Game::update(float elapsed) {
 								if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] == &(p.controls.right)) ||
 									(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] == &(p.controls.left)) ||
 									(triggerDirection == TriggerDirection::UP && p.inputs[0] == &(p.controls.down)) ||
-									(triggerDirection == TriggerDirection::DOWN && p.inputs[0] == &(p.controls.up)))	
+									(triggerDirection == TriggerDirection::DOWN && p.inputs[0] == &(p.controls.up))) {	
 										nextState = GameState::COUNTER;
+										tugClockTimer = TUG_CLOCK_DURATION;
+										tugClockBoundaryProgress = 0.0f;
+										lastAdvantageDirection = 0;
+									}
 								// If you press a non-counter direction that's not the trigger
 								else if ((triggerDirection == TriggerDirection::LEFT && p.inputs[0] != &(p.controls.left)) ||
 										(triggerDirection == TriggerDirection::RIGHT && p.inputs[0] != &(p.controls.right)) ||
@@ -260,15 +271,15 @@ void Game::update(float elapsed) {
 
 						if (nextState != GameState::ADVANTAGE) {
 							triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(rd);
-						}						
-						// 	otherwise, stay in advantage
+						}			
 					}
+					// 	otherwise, stay in advantage
 					break;
 				case GameState::END:
 					// restarting
 					if (p.controls.start.downs > 0) nextState = GameState::STANDBY;
 					break;
-				default: // COUNTER, STANDBY
+				default: // COUNTER, STANDBY, TC_VIOLATION
 					// your inputs don't matter lol
 					break;
 			}
@@ -302,6 +313,7 @@ void Game::update(float elapsed) {
 					}
 				}
 				counterBonus = 0.0f;
+				tugClockBoundaryProgress = 0.0f;
 
 				std::uniform_real_distribution<float> tri_dis(std::max(TRIGGER_MIN_TIME, shortestFalseStart), TRIGGER_MAX_TIME);
 				triggerDelay = (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(rd);
@@ -342,6 +354,16 @@ void Game::update(float elapsed) {
 				for (auto &p : players) {
 					if (p.activePlayer && p.advantage && p.penalty <= 0) {
 						tugDirection = p.advantageDirection;
+						if (p.advantageDirection == lastAdvantageDirection || lastAdvantageDirection == 0) {
+							tugClockTimer--;
+						}
+						else { assert(lastAdvantageDirection != 0); // someone had advantage prior to this
+							// switch in advantage!
+							tugClockTimer = TUG_CLOCK_DURATION - 1;
+							tugClockBoundaryProgress = 0.0f;
+						}
+						lastAdvantageDirection = p.advantageDirection;
+
 					}
 					p.penalty /= 4.0f;
 				}
@@ -367,6 +389,12 @@ void Game::update(float elapsed) {
 			else {
 				progress += tugDirection * TUG_SPEED * elapsed;
 				counterBonus -= tugDirection * TUG_SPEED * COUNTER_BONUS_RATE * elapsed;
+				tugClockBoundaryProgress += TUG_SPEED * elapsed;
+
+				if (tugClockBoundaryProgress > TUG_CLOCK_BOUNDARY) { // hooray! No tug clock violation
+					tugClockTimer = TUG_CLOCK_DURATION;
+					tugClockBoundaryProgress -= TUG_CLOCK_BOUNDARY;
+				}
 
 				assert((tugDirection < 0 && counterBonus > 0) || (tugDirection > 0 && counterBonus < 0));
 			}
@@ -400,6 +428,38 @@ void Game::update(float elapsed) {
 				else { assert(tugDirection > 0);
 					assert(lastPosition + counterBonus < progress);
 					progress = std::clamp(progress - (tugDirection * TUG_SPEED * (1.0f + COUNTER_BONUS_RATE) * elapsed), lastPosition + counterBonus, progress);
+				}
+			}
+			break;
+		case GameState::TC_VIOLATION:
+			assert(tugDirection != 0);
+			if (progress - HAND_OFFSET_X - EXTRA_HAND_OFFSET_X < ArenaMin.x || progress + HAND_OFFSET_X + EXTRA_HAND_OFFSET_X > ArenaMax.x) {
+				// VICTORY!
+				matchState = GameState::END;
+			}
+			else if (progress == lastPosition - (TUG_CLOCK_PENALTY * tugDirection)) {
+				matchState = GameState::NEUTRAL;
+				// printf("TC_VIOLATION->NEUTRAL (%i, %i)\n", dirs[0], dirs[1]);
+				tugDirection = 0;
+				counterBonus = 0.0f;
+
+				tugClockTimer = TUG_CLOCK_DURATION;
+				tugClockBoundaryProgress = 0.0f;
+				lastAdvantageDirection = 0;
+
+				// advantage state
+				for (auto &p : players) {
+					if (p.activePlayer) {
+						p.advantage = false;
+					}
+				}
+			}
+			else {
+				if (tugDirection < 0) {
+					progress = std::clamp(progress - (tugDirection * TUG_SPEED * (1.0f + COUNTER_BONUS_RATE) * elapsed), progress, lastPosition + TUG_CLOCK_PENALTY);
+				}
+				else { assert(tugDirection > 0);
+					progress = std::clamp(progress - (tugDirection * TUG_SPEED * (1.0f + COUNTER_BONUS_RATE) * elapsed), lastPosition - TUG_CLOCK_PENALTY, progress);
 				}
 			}
 			break;
@@ -470,6 +530,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 	connection.send(progress);
 	connection.send(triggerDirection);
 	connection.send(matchState);
+	connection.send(tugClockTimer);
 
 	//compute the message size and patch into the message header:
 	uint32_t size = uint32_t(connection.send_buffer.size() - mark);
@@ -539,6 +600,7 @@ bool Game::recv_state_message(Connection *connection_) {
 	read(&progress);
 	read((&triggerDirection));
 	read((&matchState));
+	read((&tugClockTimer));
 
 	if (at != size) throw std::runtime_error("Trailing data in state message.");
 

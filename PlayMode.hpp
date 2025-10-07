@@ -71,6 +71,9 @@ struct PlayMode : Mode {
 	TextMeshNovice identifier_text;
 	TextMeshNovice victory_text;
 	TextMeshNovice play_again_text;
+	TextMeshNovice tug_clock_text;
+	int lastTugClockTime = -1;
+	bool tcViolationOccurring = false;
 
 	// TODO: winner bouncing hand
 	// const float WINNER_BOUNCE_START_OFFSET_Y = 0.5f;

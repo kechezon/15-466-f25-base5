@@ -77,6 +77,7 @@ struct Game {
 	inline static constexpr float Tick = 1.0f / 30.0f;
 
 	//arena size:
+	// Clip was used for debug purposes
 	inline static constexpr glm::vec2 ArenaMin_Clip = glm::vec2(-1.5f, -1.0f);
 	inline static constexpr glm::vec2 ArenaMax_Clip = glm::vec2( 1.5f,  1.0f);
 	inline static constexpr glm::vec2 ArenaMin = glm::vec2(-6.3f,-4.0f);
@@ -89,33 +90,44 @@ struct Game {
 	
 	//game state
 	enum GameState {
-		STANDBY = 0b000001, // less than two players connected
-		NEUTRAL = 0b000010, // two players, waiting for a cue
-		TRIGGER = 0b000100, // prompt is here!
-		ADVANTAGE = 0b001000, // someone started pulling
-		COUNTER = 0b010000, // ...but the other player countered! start pulling back
-		END = 0b100000
+		STANDBY = 0b0000001, // less than two players connected
+		NEUTRAL = 0b0000010, // two players, waiting for a cue
+		TRIGGER = 0b0000100, // prompt is here!
+		ADVANTAGE = 0b0001000, // someone started pulling
+		COUNTER = 0b0010000, // ...but the other player countered! start pulling back
+		TC_VIOLATION = 0b0100000, // Tug Clock Violation! Roll back the rope...
+		END = 0b1000000
 	} matchState = STANDBY;
 
 	//progress variables and visuals
 	float progress = 0.0f; // need to reach one of the arena bounds
 	const float HAND_OFFSET_X = 1.5f; // from rope center
-	const float EXTRA_HAND_OFFSET_X = 1.0f; // from rope center
+	const float EXTRA_HAND_OFFSET_X = 1.0f; // from hand center
 	float lastPosition = 0.0f; // during COUNTER, revert back to this
-	const float COUNTER_BONUS_RATE = 0.2f; // plus 50% of progress made
-	float counterBonus = 0.0f; // plus 50% of progress made
-	const float TUG_SPEED = 1.0f; // units per second
+	const float COUNTER_BONUS_RATE = 0.2f; // plus 20% of progress made
+	float counterBonus = 0.0f; // plus 20% of progress made
+	const float TUG_SPEED = 1.25f; // units per second
 	int tugDirection = 0;
+
+	// Tug Clock (anti-stall) data
+	// If the player fails to make enough progress within enough rounds Tug Clock runs out,
+	// they'll be penalized. Switches in advantage or counters reset the tug clock.
+	const int TUG_CLOCK_DURATION = 4;
+	const float TUG_CLOCK_BOUNDARY = ArenaMax.x * 0.20f;
+	const float TUG_CLOCK_PENALTY = ArenaMax.x * 0.25f;
+	int tugClockTimer = TUG_CLOCK_DURATION;
+	float tugClockBoundaryProgress = 0.0f;
+	int lastAdvantageDirection = 0;
 
 	// randomizer needs (from cpp documentation)
 	std::random_device rd;
 
 	//QTE triggers:
 	const float TRIGGER_MIN_TIME = 3.0f;
-	// const float TRIGGER_MAX_TIME = 10.0f;
+	const float TRIGGER_MAX_TIME = 8.0f;
 	// DEBUG:
-	const float TRIGGER_MAX_TIME = 4.0f;
-	float triggerDelay = 10.0f; // how to use:
+	// const float TRIGGER_MAX_TIME = 4.0f;
+	float triggerDelay = 8.0f; // how to use:
 								// std::random_device rd;
 								// std::mt19937 gen(rd());
 								// (std::uniform_real_distribution<float>(TRIGGER_MIN_TIME, TRIGGER_MAX_TIME))(gen);

@@ -1,4 +1,4 @@
-# Quick Tug
+# Quick Tug!
 
 Author: Kenechukwu Echezona
 
@@ -26,7 +26,7 @@ How To Play:
 - When the arrow appears, press in that direction before your opponent to start pulling on the rope.
 - If you win the QTE, you'll keep pulling the rope. Press the same direction to stop pulling.
 - If you lose the QTE, you can initiate a Counter by pressing in the opposite direction. Successfully Countering before your opponent stops pulling will undo all of their progress for that particular interaction, and grant you a bonus 20% of the progress they had made!
-- Be the first to pull the rope to your side!
+- Be the first to pull the rope to your flag!
 
 Strategy:
 - While having a better reaction time than your opponent is helpful, the true key to victory in Quick Tug Event lies in the mind games.
@@ -39,6 +39,9 @@ Strategy:
 
 Sources:
 - Font used: [Google Font Hammersmith One](https://fonts.google.com/specimen/Hammersmith+One?preview.text=Select%20a%20cone%20type!&query=nic)
+- Text rendering heavily borrowed from Jim McCann's XOR/Circle mesh rendering example, and the following tutorials:
+    - https://freetype.org/freetype2/docs/tutorial/step1.html
+    - https://github.com/harfbuzz/harfbuzz-tutorial/blob/master/hello-harfbuzz-freetype.c
 
 This game was built with [NEST](NEST.md).
 
