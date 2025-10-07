@@ -106,15 +106,15 @@ struct Game {
 	float lastPosition = 0.0f; // during COUNTER, revert back to this
 	const float COUNTER_BONUS_RATE = 0.2f; // plus 20% of progress made
 	float counterBonus = 0.0f; // plus 20% of progress made
-	const float TUG_SPEED = 1.25f; // units per second
+	const float TUG_SPEED = 1.5f; // units per second
 	int tugDirection = 0;
 
 	// Tug Clock (anti-stall) data
 	// If the player fails to make enough progress within enough rounds Tug Clock runs out,
 	// they'll be penalized. Switches in advantage or counters reset the tug clock.
 	const int TUG_CLOCK_DURATION = 4;
-	const float TUG_CLOCK_BOUNDARY = ArenaMax.x * 0.20f;
-	const float TUG_CLOCK_PENALTY = ArenaMax.x * 0.25f;
+	const float TUG_CLOCK_BOUNDARY = ArenaMax.x * 0.25f;
+	const float TUG_CLOCK_PENALTY = ArenaMax.x * 0.3f;
 	int tugClockTimer = TUG_CLOCK_DURATION;
 	float tugClockBoundaryProgress = 0.0f;
 	int lastAdvantageDirection = 0;
