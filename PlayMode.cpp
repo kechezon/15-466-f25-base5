@@ -8,6 +8,7 @@
 #include "gl_errors.hpp"
 #include "data_path.hpp"
 #include "hex_dump.hpp"
+#include "TextMeshNovice.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #define GLM_ENABLE_EXPERIMENTAL
@@ -16,6 +17,7 @@
 #include <random>
 #include <array>
 #include <math.h>
+#include <cmath>
 
 /**************************************************************
  * Scene loading code based on starter code from Game2 onwards
@@ -48,7 +50,7 @@ Load< Scene > quicktug_scene(LoadTagDefault, []() -> Scene const * {
  * Scene copying code based on
  * starter code from Game 2 onwards 
  ***********************************/
-PlayMode::PlayMode(Client &client_) : scene(*quicktug_scene), client(client_){ //, scene(*quicktug_scene) {
+PlayMode::PlayMode(Client &client_) : identifier_text("YOU!"), victory_text("WINS!"), scene(*quicktug_scene), client(client_) { //, scene(*quicktug_scene) {
 	/* DEBUG */
 	for (auto &transform : scene.transforms) {
 		if (transform.name == "Rope") rope = &transform;
@@ -89,9 +91,14 @@ PlayMode::PlayMode(Client &client_) : scene(*quicktug_scene), client(client_){ /
 	//get pointer to camera for convenience:
 	if (scene.cameras.size() != 1) throw std::runtime_error("Expecting scene to have exactly one camera, but it has " + std::to_string(scene.cameras.size()));
 	camera = &scene.cameras.front();
+
+	// identifier_text = TextMeshNovice::TextMeshNovice("YOU!");
+	identifier_text.create_data_vector();
+	identifier_text.create_mesh(Mode::window, 0.0f, 0.0f, 0.2f, 0x00, 0x00, 0x00, 0xff);
 }
 
 PlayMode::~PlayMode() {
+	
 }
 
 bool PlayMode::handle_event(SDL_Event const &evt, glm::uvec2 const &window_size) {
@@ -230,6 +237,7 @@ void PlayMode::update(float elapsed) {
 				break;
 			case Game::GameState::NEUTRAL:
 				empty_box->position = glm::vec3(0.0f, 0.0f, BOX_HEIGHT);
+				victory_text.data_created = false;
 				break;
 			case Game::GameState::TRIGGER:
 				if (game.triggerDirection == Game::TriggerDirection::LEFT) box_angle = -90.0f;
@@ -289,7 +297,12 @@ void PlayMode::update(float elapsed) {
 				p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
 			case Game::GameState::END:
-				// TODO: Victory message
+				// TODO: Victory message, hide lights
+				empty_box->position = glm::vec3(0.0f, 0.0f, BOX_HEIGHT);
+				p1_light_on->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				p1_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				p2_light_on->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
+				p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
 				break;
 		}
 	}
@@ -343,134 +356,6 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	);
 	
 	{
-		// DrawLines lines(world_to_clip);
-
-		// // Set rope, hand positions, and off-lights
-		// rope->position = glm::vec3(game.progress, ROPE_OFFSET_Y, ROPE_HEIGHT);
-		// printf("(%f, %f, %f)\n", camera->transform->rotation.x, camera->transform->rotation.y, camera->transform->rotation.z);
-
-		// // Set offscreen box and light positions
-		// empty_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// trigger_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// adv_box_p1->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// adv_box_p2->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// counter_box->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// p1_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// p2_light_on->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// penalty_x1->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-		// penalty_x2->position = glm::vec3(0.0f, 0.0f, Game::ArenaMax.y * 2);
-
-		// if (Player::activePlayerCount >= 1) {
-		// 	p1_hands->position = glm::vec3(game.progress - game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
-		// 	p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-
-		// 	if (Player::activePlayerCount == 2) {
-		// 		p2_hands->position = glm::vec3(game.progress + game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
-		// 		p2_hands->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-
-		// 		for (auto const &player : game.players) {
-		// 			if (player.activePlayer) {
-		// 				if (player.advantageDirection < 0 && player.penalty > 0.0f) {
-		// 					penalty_x1->position = p1_hands->position + glm::vec3(0.0f, -0.5f, 0.0f);
-		// 				}
-		// 				else if (player.penalty > 0.0f) { assert(player.advantageDirection > 0);
-		// 					penalty_x2->position = p2_hands->position + glm::vec3(0.0f, -0.5f, 0.0f);
-		// 				}
-		// 			}
-		// 		}
-		// 	}
-		// }
-
-		// // Set trigger box and other models based on game state
-		// float box_angle = 0.0f;
-		// Scene::Transform *adv_box = nullptr;
-		// Scene::Transform *adv_light = nullptr;
-		// Scene::Transform *adv_off = nullptr;
-		// int adv_dir = 0;
-		// switch (game.matchState) {
-		// 	case Game::GameState::STANDBY:
-		// 		// empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
-		// 		break;
-		// 	case Game::GameState::NEUTRAL:
-		// 		empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
-		// 		break;
-		// 	case Game::GameState::TRIGGER:
-		// 		if (game.triggerDirection == Game::TriggerDirection::LEFT) box_angle = 90.0f;
-		// 		else if (game.triggerDirection == Game::TriggerDirection::RIGHT) box_angle = -90.0f;
-		// 		else if (game.triggerDirection == Game::TriggerDirection::DOWN) box_angle = 180.0f;
-
-		// 		trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
-		// 		trigger_box->rotation = glm::quat(1.0f, 0.0f, box_angle, 0.0f);
-		// 		break;
-		// 	case Game::GameState::ADVANTAGE:
-		// 		// Trigger Box and Light need to be brought into the fold
-
-		// 		for (auto const &player : game.players) { // find who has advantage
-		// 			if (player.advantageDirection < 0) {
-		// 				assert(player.activePlayer);
-		// 				adv_box = adv_box_p1;
-		// 				adv_light = p1_light_on;
-		// 				adv_off = p1_light_off;
-		// 				break;
-		// 			}
-		// 			else if (player.advantageDirection > 0) {
-		// 				assert(player.activePlayer);
-		// 				adv_box = adv_box_p2;
-		// 				adv_light = p2_light_on;
-		// 				adv_off = p2_light_off;
-		// 				break;
-		// 			}
-		// 		}
-		// 		assert(adv_box != nullptr);
-		// 		assert(adv_light != nullptr);
-		// 		assert(adv_off != nullptr);
-		// 		assert(adv_dir != 0);
-
-		// 		if (game.triggerDirection == Game::TriggerDirection::LEFT) box_angle = -90.0f;
-		// 		else if (game.triggerDirection == Game::TriggerDirection::RIGHT) box_angle = 90.0f;
-		// 		else if (game.triggerDirection == Game::TriggerDirection::DOWN) box_angle = 180.0f;
-
-		// 		adv_box->position = glm::vec3(0.0f, 0.0f, box_height);
-		// 		adv_box->rotation = glm::quat(1.0f, 0.0f, box_angle, 0.0f);
-		// 		adv_light->position = glm::vec3(game.progress + (LIGHT_OFFSET_X * adv_dir), 0.0f, ROPE_HEIGHT);
-		// 		adv_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
-		// 		break;
-		// 	case Game::GameState::COUNTER:
-		// 		trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
-		// 		p1_light_on->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-		// 		p1_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
-		// 		p2_light_on->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-		// 		p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
-		// 		break;
-		// 	case Game::GameState::END:
-		// 		// TODO: Victory message
-		// 		break;
-		// }
-
-		// DEBUG:
-
-		//helper:
-		// auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
-		// 	lines.draw_text(text,
-		// 		glm::vec3(at.x, at.y, 0.0),
-		// 		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-		// 		glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-		// 	float ofs = (1.0f / scale) / drawable_size.y;
-		// 	lines.draw_text(text,
-		// 		glm::vec3(at.x + ofs, at.y + ofs, 0.0),
-		// 		glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-		// 		glm::u8vec4(0xff, 0xff, 0xff, 0x00));
-		// };
-
-		// lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		// lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		// lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		// lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff))
-		
-	}
-
-	/*
-	{
 		DrawLines lines(world_to_clip);
 
 		auto draw_text = [&](glm::vec2 const &at, std::string const &text, float H) {
@@ -490,140 +375,61 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 				glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
 				if (&player == &game.players.front()) {
 					//mark current player (which server sends first):
-					// lines.draw(
-					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2(-0.5f,-0.5f), 0.0f),
-					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2( 0.5f, 0.5f), 0.0f),
-					// 	col
-					// );
-					// lines.draw(
-					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2(-0.5f, 0.5f), 0.0f),
-					// 	glm::vec3(game.progress + (player.advantageDirection * game.HAND_OFFSET_X) + Game::PlayerRadius * glm::vec2( 0.5f,-0.5f), 0.0f),
-					// 	col
-					// );
-					draw_text(glm::vec2(game.progress + (player.advantageDirection * (game.HAND_OFFSET_X - Game::PlayerRadius)), ROPE_HEIGHT - 0.1f - Game::PlayerRadius), "YOU!", 0.09f);
-				}
-				glm::vec2 pos = glm::vec2(game.progress + (player.advantageDirection * game.HAND_OFFSET_X), ROPE_HEIGHT);
-				for (uint32_t a = 0; a < circle.size(); ++a) {
-					lines.draw(
-						glm::vec3(pos + Game::PlayerRadius * circle[a], 0.0f),
-						glm::vec3(pos + Game::PlayerRadius * circle[(a+1)%circle.size()], 0.0f),
-						col
-					);
-				}
 
-				// False start
-				if (player.penalty > 0)
-					draw_text(glm::vec2(game.progress + (player.advantageDirection * (game.HAND_OFFSET_X + Game::PlayerRadius)), ROPE_HEIGHT + 0.1f + Game::PlayerRadius), std::to_string(player.penalty), 0.09f);
+					// Code for multiplying mat4 and vec3: https://stackoverflow.com/questions/36358621/multiply-vec3-with-mat4-using-glm
+					glm::vec3 you_text_clip = glm::vec3(world_to_clip * glm::vec4(game.progress + (HAND_OFFSET_X * player.advantageDirection), ROPE_HEIGHT - 0.5f, 0.0f, 1.0f));
+					// std::cout << "(" << you_text_clip.x << ", " << you_text_clip.y << ", " << you_text_clip.z << ")" << std::endl;
 
+					if (player.advantageDirection < 0) identifier_text.set_position(Mode::window, you_text_clip.x, you_text_clip.y, 0.1f,
+																					0x00, 0x00, 0xff, 0xff);
+					else { assert(player.advantageDirection > 0);
+						identifier_text.set_position(Mode::window, you_text_clip.x, you_text_clip.y, 0.1f,
+																					0xff, 0x00, 0x00, 0xff);
+					}
+					identifier_text.draw_text_mesh();
+				}
 				// draw_text(glm::vec2(0.0f, -0.1f + Game::PlayerRadius), player.name, 0.09f);
 			}
 		}
 
-		// if (Player::activePlayerCount >= 1) {
-			// p1_hands->position = glm::vec3(game.progress - game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
-			// p1_light_off->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
+		if (game.matchState == Game::GameState::END) {
+			if (!victory_text.data_created) victory_text.create_data_vector();
 
-			// if (Player::activePlayerCount == 2) {
-			// 	p2_hands->position = glm::vec3(game.progress + game.HAND_OFFSET_X, 0.0f, ROPE_HEIGHT);
-			// 	p2_hands->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-			// }
-		// }
-
-		switch (game.matchState) {
-			case Game::GameState::STANDBY:
-				// empty_box->position = glm::vec3(0.0f, 0.0f, box_height);
-				break;
-			case Game::GameState::NEUTRAL:
-				// assert(Player::activePlayerCount == 2);
-				draw_text(glm::vec2(0.0f, box_height), "Wait for it...", 0.09f);
-				break;
-			case Game::GameState::TRIGGER:
-				if (game.triggerDirection == Game::TriggerDirection::LEFT)
-					draw_text(glm::vec2(0.0f, box_height), "LEFT!", 0.09f);
-				else if (game.triggerDirection == Game::TriggerDirection::RIGHT)
-					draw_text(glm::vec2(0.0f, box_height), "RIGHT!", 0.09f);
-				else if (game.triggerDirection == Game::TriggerDirection::DOWN)
-					draw_text(glm::vec2(0.0f, box_height), "DOWN!", 0.09f);
-				else { assert(game.triggerDirection == Game::TriggerDirection::UP);
-					draw_text(glm::vec2(0.0f, box_height), "UP!", 0.09f);
-				}
-
-				// trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
-				// trigger_box->rotation = glm::quat(1.0f, 0.0f, box_angle, 0.0f);
-				break;
-			case Game::GameState::ADVANTAGE:
-				// Trigger Box and Light need to be brought into the fold
-
-				if (game.triggerDirection == Game::TriggerDirection::LEFT)
-					draw_text(glm::vec2(0.0f, box_height), "It's going Left!", 0.09f);
-				else if (game.triggerDirection == Game::TriggerDirection::RIGHT)
-					draw_text(glm::vec2(0.0f, box_height), "It's going Right!", 0.09f);
-				else if (game.triggerDirection == Game::TriggerDirection::DOWN)
-					draw_text(glm::vec2(0.0f, box_height), "It's going Down!", 0.09f);
-				else { assert(game.triggerDirection == Game::TriggerDirection::UP);
-					draw_text(glm::vec2(0.0f, box_height), "It's going Up!", 0.09f);
-				}
-
-				break;
-			case Game::GameState::COUNTER:
-				draw_text(glm::vec2(0.0f, box_height), "COUNTER!!", 0.09f);
-				// trigger_box->position = glm::vec3(0.0f, 0.0f, box_height);
-				// p1_light_on->position = glm::vec3(game.progress - LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-				// p1_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
-				// p2_light_on->position = glm::vec3(game.progress + LIGHT_OFFSET_X, 0.0f, ROPE_HEIGHT);
-				// p2_light_off->position = glm::vec3(0.0f, 0.0f, game.ArenaMax.y * 2);
-				break;
-			case Game::GameState::END:
+			auto determine_leading_player = [&]() {
 				if (game.progress < 0) {
-					for (auto const &player : game.players) {
-						if (&player == &game.players.front()) {
+					for (auto &p : game.players) {
+						if (p.activePlayer && p.advantageDirection < 0) {
+							return &p;
+						}
+					}
+				}
+				else if (game.progress > 0) {
+					for (auto &p : game.players) {
+						if (p.activePlayer && p.advantageDirection > 0) {
+							return &p;
+						}
+					}
+				}
+				return (Player *)nullptr;
+			};
+			
+			if (!victory_text.data_created) {
+				printf("setting\n");
+				glm::vec3 victory_text_clip = glm::vec3(world_to_clip * glm::vec4(0.0f, 0.4f, 0.0f, 1.0f));
 
-							// find winner
-							std::string winner;
-							for (auto const &p : game.players) {
-								if (p.activePlayer && p.advantageDirection < 0) {
-									if (!(player.activePlayer) || p.name == player.name) {
-										winner = p.name + " wins!";
-										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again!", 0.09f);
-									}
-									else {
-										winner = p.name + " wins...";
-										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again", 0.09f);
-									}
-									break;
-								}
-							}
-							draw_text(glm::vec2(0.0f, box_height), winner, 0.09f);
-							break;
-						}
-					}
+				Player *winner = determine_leading_player();
+				assert(winner != nullptr);
+				victory_text.set_text((winner->name + std::string(" wins!!")).c_str());
+				victory_text.create_data_vector();
+				if (winner->advantageDirection < 0) {
+					victory_text.set_position(Mode::window, victory_text_clip.x, victory_text_clip.y, 0.2f,
+																						0x00, 0x00, 0xff, 0xff);
+				} else { assert(winner->advantageDirection > 0);
+					victory_text.set_position(Mode::window, victory_text_clip.x, victory_text_clip.y, 0.2f,
+																						0xff, 0x00, 0x00, 0xff);
 				}
-				else { assert(game.progress > 0);
-					for (auto const &player : game.players) {
-						if (&player == &game.players.front()) {
-							// find winner
-							std::string winner;
-							for (auto const &p : game.players) {
-								if (p.activePlayer && p.advantageDirection > 0) {
-									if (!(player.activePlayer) || p.name == player.name) {
-										winner = p.name + " wins!";
-										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again!", 0.09f);
-									}
-									else {
-										winner = p.name + " wins...";
-										draw_text(glm::vec2(0.0f, 0.0f), "Press Space/Enter to Play Again", 0.09f);
-									}
-									break;
-								}
-							}
-							draw_text(glm::vec2(0.0f, box_height), winner, 0.09f);
-							break;
-						}
-					}
-				}
-				break;
-			default:
-				break;
+			}
+			victory_text.draw_text_mesh();
 		}
 
 		// DEBUG:
@@ -641,39 +447,11 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		// 		glm::u8vec4(0xff, 0xff, 0xff, 0x00));
 		// };
 
-		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
-		lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		// lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		// lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		// lines.draw(glm::vec3(Game::ArenaMin.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMin.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
+		// lines.draw(glm::vec3(Game::ArenaMax.x, Game::ArenaMin.y, 0.0f), glm::vec3(Game::ArenaMax.x, Game::ArenaMax.y, 0.0f), glm::u8vec4(0xff, 0x00, 0xff, 0xff));
 		
-	}*/
-
-	{
-		/*for (auto const &player : game.players) {
-			glm::u8vec4 col = glm::u8vec4(player.color.x*255, player.color.y*255, player.color.z*255, 0xff);
-			if (&player == &game.players.front()) {
-				//mark current player (which server sends first):
-				lines.draw(
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2(-0.5f,-0.5f), 0.0f),
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2( 0.5f, 0.5f), 0.0f),
-					col
-				);
-				lines.draw(
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2(-0.5f, 0.5f), 0.0f),
-					glm::vec3(player.position + Game::PlayerRadius * glm::vec2( 0.5f,-0.5f), 0.0f),
-					col
-				);
-			}
-			for (uint32_t a = 0; a < circle.size(); ++a) {
-				lines.draw(
-					glm::vec3(player.position + Game::PlayerRadius * circle[a], 0.0f),
-					glm::vec3(player.position + Game::PlayerRadius * circle[(a+1)%circle.size()], 0.0f),
-					col
-				);
-			}
-
-			draw_text(player.position + glm::vec2(0.0f, -0.1f + Game::PlayerRadius), player.name, 0.09f);
-		}*/
 	}
 	GL_ERRORS();
 }

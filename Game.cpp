@@ -439,7 +439,7 @@ void Game::send_state_message(Connection *connection_, Player *connection_player
 		// connection.send(player.position);
 		// connection.send(player.velocity);
 		// DEBUG
-		connection.send(player.color);
+		// connection.send(player.color);
 
 		connection.send(player.playerNumber);
 		connection.send(player.activePlayer);
@@ -514,7 +514,7 @@ bool Game::recv_state_message(Connection *connection_) {
 		Player &player = players.back();
 
 		// DEBUG
-		read(&player.color);
+		// read(&player.color);
 
 		read(&player.playerNumber);
 		read(&player.activePlayer);

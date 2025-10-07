@@ -1,9 +1,10 @@
 #include "Mode.hpp"
-
 #include "Scene.hpp"
 
 #include "Connection.hpp"
 #include "Game.hpp"
+
+#include "TextMeshNovice.hpp"
 
 #include <glm/glm.hpp>
 
@@ -38,7 +39,7 @@ struct PlayMode : Mode {
 	//connection to server:
 	Client &client;
 
-	//visuals, using blender world space (z axis is up!)
+	//3D Models, using blender world space (z axis is up!)
 	//anything that's not shown is pushed off screen, a la PPU466
 	Scene::Transform *rope = nullptr;
 	Scene::Transform *p1_hands = nullptr; 
@@ -65,6 +66,10 @@ struct PlayMode : Mode {
 	const float ROPE_OFFSET_Y = 0.15f;
 	const float PENALTY_OFFSET_Y = -0.4f;
 	const float BOX_HEIGHT = 2.0f;
+
+	// Text
+	TextMeshNovice identifier_text;
+	TextMeshNovice victory_text;
 
 	// TODO: winner bouncing hand
 	// const float WINNER_BOUNCE_START_OFFSET_Y = 0.5f;

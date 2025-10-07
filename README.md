@@ -36,7 +36,8 @@ Strategy:
 - When you Counter, you not only undo your opponents progress, but even gain a percentage of the progress they made, so sometimes it might be worth it to delay your Counter.
 - Be aware of the Tug Clock. It should really only matter if you're turtling (ending your pulls very quickly), but it can set you back if you aren't careful!
 
-Sources: (TODO: list a source URL for any assets you did not create yourself. Make sure you have a license for the asset.)
+Sources:
+- Font used: [Google Font Hammersmith One](https://fonts.google.com/specimen/Hammersmith+One?preview.text=Select%20a%20cone%20type!&query=nic)
 
 This game was built with [NEST](NEST.md).
 
